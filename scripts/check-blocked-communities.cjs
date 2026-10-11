@@ -1,0 +1,60 @@
+async page => {
+  const states = {'heybox.preferences':{theme:'light',zoom:100,exit:'close',shortcuts:true,animations:false,showSidebar:false},'heybox.community-filter':{mode:'exclude',included:[10],excluded:[20,777],unknown:false},'heybox.bookmarks':[1],'heybox.history':[],'heybox.home-communities':null};
+  const community=(id,name)=>({id,name,short:name[0],color:'#ddd',members:'社区',icon:''});
+  const catalog=[community(10,'Steam'),community(20,'PC游戏')], extra=community(99,'搜索社区');
+  const post=(id,title,topicIds)=>({id,title,topicIds,topics:catalog.filter(c=>topicIds.includes(c.id)),userId:'123',author:'测试盒友',avatar:'测',avatarUrl:'',color:'#ddd',time:'刚刚',excerpt:'测试社区屏蔽',body:[],likes:0,comments:0,images:[],level:0,medalUrl:'',medalName:'',liked:false,createdAt:0,videoUrl:'',isCy:false});
+  const posts=[post(1,'Steam帖子',[10]),post(2,'PC帖子',[20]),post(3,'未分类帖子',[]),post(4,'跨社区帖子',[10,20]),post(5,'搜索社区帖子',[99])];
+  const requests=[];
+  await page.setViewportSize({width:1280,height:1000});
+  await page.addInitScript(saved=>{for(const[key,value]of Object.entries(saved))localStorage.setItem(key,JSON.stringify(value));},states);
+  await page.route('**/api/command',async route=>{
+    const r=route.request().postDataJSON();let data;
+    switch(r.type){
+      case 'bootstrap':data={account:null,states,dataDirectory:'synthetic-test'};break;
+      case 'stateGet':data=states[r.payload.key]??null;break;
+      case 'stateSet':states[r.payload.key]=r.payload.value;data=true;break;
+      case 'communities':data=r.payload.query?[extra]:catalog;break;
+      case 'emojis':data={version:'synthetic',emojis:[]};break;
+      case 'feed':requests.push(r.payload);data={posts,cursor:{offset:0,topics:{},exhausted:[],rotation:0},hasMore:false};break;
+      case 'localPosts':data=posts.filter(p=>r.payload.ids.includes(p.id));break;
+      default:throw new Error(`Unexpected command ${r.type}`);
+    }
+    await route.fulfill({json:{ok:true,data}});
+  });
+  const waitUntil=async predicate=>{const end=Date.now()+10000;while(!predicate()){if(Date.now()>end)throw new Error('Persistence timed out');await new Promise(resolve=>setTimeout(resolve,25));}};
+  const checkPosts=async ids=>page.waitForFunction(ids=>JSON.stringify([...document.querySelectorAll('.post-content h2')].map(e=>e.textContent))===JSON.stringify(ids),ids);
+  await page.goto('http://127.0.0.1:5173/');
+  await checkPosts(['Steam帖子','未分类帖子','搜索社区帖子']);
+  if(await page.locator('.feed-heading,.feed-tabs,.filter-trigger,.filter-summary').count())throw new Error('Removed homepage row still exists');
+  if(requests.some(r=>r.tab!=='推荐'||r.filter.mode!=='exclude'||r.filter.included.length||!r.filter.unknown))throw new Error('Legacy non-block filters still used');
+  await page.screenshot({path:'output/playwright/home-without-tabs.png'});
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.locator('.settings-nav').getByRole('button',{name:'屏蔽社区',exact:true}).click();
+  if(await page.locator('.filter-modes,.checkbox-row').count()||await page.getByRole('button',{name:'应用筛选',exact:true}).count())throw new Error('Old filter controls still exist');
+  await page.getByRole('button',{name:'取消屏蔽社区 777',exact:true}).click();
+  await page.locator('.blocked-community-choices').getByRole('button',{name:'屏蔽Steam',exact:true}).click();
+  await checkPosts(['未分类帖子','搜索社区帖子']);
+  await page.getByRole('textbox',{name:'搜索屏蔽社区',exact:true}).fill('搜索');
+  await page.locator('.blocked-community-choices').getByRole('button',{name:'屏蔽搜索社区',exact:true}).click();
+  await checkPosts(['未分类帖子']);
+  await waitUntil(()=>states['heybox.community-filter'].excluded.join(',')==='20,10,99');
+  await page.screenshot({path:'output/playwright/blocked-communities.png'});
+  await page.getByRole('button',{name:'完成',exact:true}).click();
+  await page.getByRole('button',{name:'刷新推荐内容',exact:true}).click();
+  await checkPosts(['未分类帖子']);
+  await page.reload();await checkPosts(['未分类帖子']);
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.locator('.settings-nav').getByRole('button',{name:'屏蔽社区',exact:true}).click();
+  await page.getByRole('button',{name:'清空屏蔽社区',exact:true}).click();
+  await checkPosts(posts.map(p=>p.title));
+  await waitUntil(()=>states['heybox.community-filter'].excluded.length===0);
+  await page.getByRole('button',{name:'完成',exact:true}).click();
+  states['heybox.community-filter']={mode:'include',included:[10],excluded:[20],unknown:false};
+  await page.reload();await checkPosts(posts.map(p=>p.title));
+  await waitUntil(()=>states['heybox.community-filter'].mode==='exclude'&&states['heybox.community-filter'].excluded.length===0&&states['heybox.community-filter'].unknown);
+  await page.getByRole('button',{name:'切换页面',exact:true}).click();
+  await page.getByRole('button',{name:'我的收藏',exact:true}).click();
+  await checkPosts(['Steam帖子']);
+  await page.getByRole('heading',{name:/^我的收藏\s*1$/}).waitFor();
+  return {removedRow:true,recommendationsOnly:true,settingsOnlyBlocking:true,legacyBlocksPreserved:true,unknownPostsKept:true,multiTopicBlocked:true,multiSelect:true,search:true,unknownBlockRemovable:true,automaticSave:true,refreshAndReload:true,clearBlocks:true,legacyIncludeRemoved:true,collectionHeadingKept:true};
+}
