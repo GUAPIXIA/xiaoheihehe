@@ -42,6 +42,7 @@ fn client(jar: Arc<Jar>) -> Result<Client> {
     deny_unknown_fields
 )]
 pub enum Command {
+    CheckUpdate,
     Bootstrap,
     Emojis,
     StateGet {
@@ -339,6 +340,7 @@ impl Backend {
     }
     pub async fn execute(&self, command: Command) -> Result<Value> {
         match command {
+            Command::CheckUpdate => crate::update::check().await,
             Command::Emojis => {
                 if let Some(cached) = self.storage.cached("emojis", 24 * 3600)? {
                     return Ok(cached);

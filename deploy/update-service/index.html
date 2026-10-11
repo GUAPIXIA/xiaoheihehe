@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小黑盒盒 · 下载与更新</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:56px 24px;background:#17191d;color:#e6e7e9;font-family:'Segoe UI','Microsoft YaHei',sans-serif}main{max-width:640px;margin:auto}h1{font-size:32px;margin:0 0 12px}p{color:#a0a3ab;line-height:1.8}section{margin-top:32px;padding:24px;border:1px solid #363940;border-radius:12px;background:#202226}h2{font-size:18px}a{color:#b7c9ef;text-decoration:none}#download{display:inline-block;background:#e6e7e9;color:#202226;padding:12px 20px;border-radius:6px;font-weight:600}#notes{white-space:pre-wrap;overflow-wrap:anywhere}#hash{font-size:12px;overflow-wrap:anywhere;color:#a0a3ab}footer{margin-top:32px;font-size:13px}footer a{margin-right:16px}[hidden]{display:none!important}
+</style>
+<main><h1>小黑盒盒</h1><p>Windows 第三方小黑盒社区客户端</p>
+<section><h2 id="version">正在获取最新版本…</h2><p id="notes"></p><p id="size"></p>
+<a id="download" hidden>下载 Windows x64 安装包</a>
+<p id="hint" hidden>下载完成后，退出正在运行的小黑盒盒，再运行安装包完成安装或更新。</p>
+<p id="hash"></p></section>
+<footer><a href="https://github.com/GUAPIXIA/xiaoheihehe" rel="noopener noreferrer">GitHub 项目源码</a><a href="https://space.bilibili.com/455009957?spm_id_from=333.1007.0.0" rel="noopener noreferrer">B 站 · 超级本推荐</a></footer>
+</main><script>
+(async()=>{try{const response=await fetch('./api/version',{cache:'no-store'});if(!response.ok)throw Error();const release=await response.json();
+const url=new URL(release.downloadUrl);if(url.origin!==location.origin||!/^\/xiaoheihehe\/releases\/\d+\.\d+\.\d+\/xiaoheihehe_\d+\.\d+\.\d+_x64-setup\.exe$/.test(url.pathname)||url.search||url.hash)throw Error();
+document.getElementById('version').textContent='最新版本 '+release.version;document.getElementById('notes').textContent=release.notes;
+document.getElementById('size').textContent='Windows x64 · '+(release.size/1024/1024).toFixed(2)+' MiB';const link=document.getElementById('download');link.href=url.href;link.hidden=false;
+document.getElementById('hint').hidden=false;document.getElementById('hash').textContent='SHA-256：'+release.sha256;
+}catch{document.getElementById('version').textContent='暂时无法获取版本信息';document.getElementById('notes').textContent='请稍后刷新页面重试。';}})();
+</script></html>

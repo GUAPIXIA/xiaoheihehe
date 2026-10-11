@@ -241,6 +241,11 @@ input[type='checkbox'], input[type='radio'] { accent-color: #526074; }
 .about-link > span { min-width: 0; }
 .about-link strong { display: block; font-size: 12px; font-weight: 600; }
 .about-link small { display: block; margin-top: 5px; color: var(--secondary); font-size: 10px; overflow-wrap: anywhere; }
+.about-update { margin-top: 12px; font-size: 11px; }
+.about-update > .text-button { display: inline-flex; align-items: center; gap: 5px; }
+.about-update .update-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.about-update .primary-button { display: inline-flex; align-items: center; gap: 6px; }
+.about-update small { display: block; margin-top: 8px; color: var(--muted); }
 .user-panel { text-align: center; padding: 0 0 8px; }.user-avatar { background: var(--soft); color: var(--muted); width: 65px; height: 65px; display: inline-flex; justify-content: center; align-items: center; border-radius: 50%; }
 .user-panel h3 { font-size: 15px; margin: 18px 0 8px; }.user-panel p { font-size: 12px; color: var(--secondary); }
 .login-placeholder { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 25px 0 15px; background: var(--soft); padding: 18px 10px; color: var(--secondary); font-size: 12px; border-radius: 5px; }

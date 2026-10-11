@@ -10,6 +10,7 @@ export interface Detail { post: Post | null; comments: Comment[]; page: number; 
 export interface Qr { session: string; svg: string; expiresAt: number }
 export interface QrStatus { state: 'waiting' | 'scanned' | 'expired' | 'error' | 'success'; message?: string; account?: Account }
 export interface Bootstrap { account: Account | null; states: Record<string, unknown>; dataDirectory: string }
+export interface UpdateInfo { currentVersion: string; version: string; available: boolean; notes: string; publishedAt: string; platform: string; downloadUrl: string; sha256: string; size: number }
 
 export async function api<T>(type: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
   const request = payload === undefined ? { type } : { type, payload };

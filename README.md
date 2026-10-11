@@ -2,6 +2,12 @@
 
 Windows 第三方社区客户端，采用 Tauri 2、React、TypeScript、Rust 和 SQLite。仅支持小黑盒 App 扫码登录，没有密码、短信登录或发布文章入口。
 
+## 下载与更新
+
+在 [下载与更新页](https://cjbtj.xyz/xiaoheihehe/) 获取最新 Windows x64 安装包。0.1.1 起可通过“设置 → 关于 → 检查更新”查看新版本并下载安装包；下载后退出程序，再运行安装包完成更新。
+
+发布流程与服务器维护见 [更新服务说明](docs/08-更新服务.md)。
+
 ## 界面预览
 
 以下截图来自接入现有登录账号的开发预览，展示真实推荐内容、帖子与评论；当前账号头像已隐藏。
@@ -76,7 +82,7 @@ npm run desktop:build
 
 Windows 构建脚本自动寻找 MSVC 和 SDK，避免误用 Git 的同名链接工具。安装包生成于 `target/release/bundle/nsis/`。程序依赖系统 WebView2；缺少时由安装器下载运行时。
 
-发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.0_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
+发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.1_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
 
 首次安装默认位置为 `D:\Apps\HeyboxCommunity`；D 盘不可用时采用当前用户目录。可在安装界面修改位置，升级保留原安装目录。
 

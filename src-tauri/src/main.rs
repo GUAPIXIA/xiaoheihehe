@@ -106,6 +106,7 @@ fn is_allowed_external_url(url: &str) -> bool {
         || url.starts_with("https://www.xiaoheihe.cn/")
         || url == "https://github.com/GUAPIXIA/xiaoheihehe"
         || url == "https://space.bilibili.com/455009957?spm_id_from=333.1007.0.0"
+        || heybox_backend::update::allowed_download_url(url)
 }
 
 #[tauri::command]
@@ -200,6 +201,7 @@ mod tests {
         for url in [
             "https://github.com/GUAPIXIA/xiaoheihehe",
             "https://space.bilibili.com/455009957?spm_id_from=333.1007.0.0",
+            "https://cjbtj.xyz/xiaoheihehe/releases/0.1.1/xiaoheihehe_0.1.1_x64-setup.exe",
             "https://xiaoheihe.cn/app/bbs/home",
             "https://www.xiaoheihe.cn/app/bbs/link/123",
         ] {
@@ -213,6 +215,7 @@ mod tests {
             "https://xiaoheihe.cn@evil/app/bbs/home",
             "http://github.com/GUAPIXIA/xiaoheihehe",
             "file:///C:/Windows/System32/cmd.exe",
+            "https://cjbtj.xyz/xiaoheihehe/releases/0.1.1/xiaoheihehe_0.1.1_x64-setup.exe?command=1",
         ] {
             assert!(!is_allowed_external_url(url));
         }
