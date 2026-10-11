@@ -15,6 +15,7 @@
 (async()=>{try{const response=await fetch('./api/version',{cache:'no-store'});if(!response.ok)throw Error();const release=await response.json();
 const url=new URL(release.downloadUrl);if(url.origin!==location.origin||!/^\/xiaoheihehe\/releases\/\d+\.\d+\.\d+\/xiaoheihehe_\d+\.\d+\.\d+_x64-setup\.exe$/.test(url.pathname)||url.search||url.hash)throw Error();
 document.getElementById('version').textContent='最新版本 '+release.version;document.getElementById('notes').textContent=release.notes;
+if(!/^[a-f0-9]{64}$/.test(release.sha256))throw Error();url.searchParams.set('sha256',release.sha256);
 document.getElementById('size').textContent='Windows x64 · '+(release.size/1024/1024).toFixed(2)+' MiB';const link=document.getElementById('download');link.href=url.href;link.hidden=false;
 document.getElementById('hint').hidden=false;document.getElementById('hash').textContent='SHA-256：'+release.sha256;
 }catch{document.getElementById('version').textContent='暂时无法获取版本信息';document.getElementById('notes').textContent='请稍后刷新页面重试。';}})();
