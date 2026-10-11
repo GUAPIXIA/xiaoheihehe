@@ -101,9 +101,16 @@ fn window_action(
     }
 }
 
+fn is_allowed_external_url(url: &str) -> bool {
+    url.starts_with("https://xiaoheihe.cn/")
+        || url.starts_with("https://www.xiaoheihe.cn/")
+        || url == "https://github.com/GUAPIXIA/xiaoheihehe"
+        || url == "https://space.bilibili.com/455009957?spm_id_from=333.1007.0.0"
+}
+
 #[tauri::command]
 fn open_official(url: String) -> Result<()> {
-    if !url.starts_with("https://xiaoheihe.cn/") && !url.starts_with("https://www.xiaoheihe.cn/") {
+    if !is_allowed_external_url(&url) {
         return Err(AppError::invalid());
     }
     std::process::Command::new("explorer.exe")
@@ -187,6 +194,29 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn about_links_are_allowed_without_allowing_arbitrary_external_urls() {
+        for url in [
+            "https://github.com/GUAPIXIA/xiaoheihehe",
+            "https://space.bilibili.com/455009957?spm_id_from=333.1007.0.0",
+            "https://xiaoheihe.cn/app/bbs/home",
+            "https://www.xiaoheihe.cn/app/bbs/link/123",
+        ] {
+            assert!(is_allowed_external_url(url));
+        }
+        for url in [
+            "https://github.com/other/repository",
+            "https://github.com/GUAPIXIA/xiaoheihehe.evil",
+            "https://space.bilibili.com/other",
+            "https://xiaoheihe.cn.evil/app/bbs/home",
+            "https://xiaoheihe.cn@evil/app/bbs/home",
+            "http://github.com/GUAPIXIA/xiaoheihehe",
+            "file:///C:/Windows/System32/cmd.exe",
+        ] {
+            assert!(!is_allowed_external_url(url));
+        }
+    }
 
     #[test]
     fn custom_width_is_independent_of_sidebar_and_fits_screen() {
