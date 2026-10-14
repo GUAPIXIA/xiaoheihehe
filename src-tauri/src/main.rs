@@ -40,6 +40,7 @@ fn window_action(
     show_sidebar: Option<bool>,
     window_height: Option<u32>,
     window_width: Option<u32>,
+    always_on_top: Option<bool>,
 ) -> Result<()> {
     let fail = |_| AppError::new("window", "窗口操作失败");
     match action.as_str() {
@@ -52,6 +53,9 @@ fn window_action(
             }
         }
         "drag" => window.start_dragging().map_err(fail),
+        "alwaysOnTop" => window
+            .set_always_on_top(always_on_top.ok_or_else(AppError::invalid)?)
+            .map_err(fail),
         "close" => {
             let prefs = state
                 .storage

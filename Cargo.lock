@@ -1436,7 +1436,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "heybox-backend"
-version = "0.1.1"
+version = "0.1.3"
 dependencies = [
  "axum",
  "futures-util",
@@ -1457,7 +1457,7 @@ dependencies = [
 
 [[package]]
 name = "heybox-community"
-version = "0.1.1"
+version = "0.1.3"
 dependencies = [
  "heybox-backend",
  "serde_json",

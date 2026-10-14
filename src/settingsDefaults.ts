@@ -31,17 +31,4 @@ export const defaultCommunityFilter: Filter = {
 };
 export const defaultBlockedKeywords: string[] = [];
 
-export const defaultHomeCommunities: Community[] = [
-  {
-    id: 425422, name: 'Steam', short: 'S', color: '#5c6c85', members: '社区',
-    icon: 'https://cdn.max-c.com/mobile/app/icon/ccb3c23e275bef48aa7863ac5609ce8b.png',
-  },
-  {
-    id: 43, name: 'CS2', short: 'C', color: '#5c6c85', members: '社区',
-    icon: 'https://imgheybox.max-c.com/oa/2023/09/28/17490d786f2942df8ea361c907c49d9c.jpeg',
-  },
-  {
-    id: 22946, name: '火影忍者', short: '火', color: '#5c6c85', members: '社区',
-    icon: 'https://cdn.max-c.com/mobile/app/icon/4c36cbe52c6cfe2b9717b2a567dc5030.png',
-  },
-];
+export const defaultHomeCommunities: Community[] = [];

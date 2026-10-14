@@ -33,6 +33,9 @@ export function errorOf(error: unknown): ApiError {
 export async function windowAction(action: string, zoom?: number, showSidebar?: boolean, windowHeight?: number, windowWidth?: number) {
   if (desktop) return invoke('window_action', { action, zoom, showSidebar, windowHeight, windowWidth });
 }
+export async function setWindowAlwaysOnTop(alwaysOnTop: boolean) {
+  if (desktop) await invoke('window_action', { action: 'alwaysOnTop', alwaysOnTop });
+}
 export async function openOfficial(url: string) {
   if (desktop) await invoke('open_official', { url });
   else window.open(url, '_blank', 'noopener,noreferrer');

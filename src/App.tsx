@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowUpToLine, Bookmark, Check, ChevronDown, ChevronRight, ChevronsUpDown, CircleHelp, Home, Maximize2, MessageCircle, Minus, Moon, MoreHorizontal, PanelTop, PencilLine, RefreshCw, Search, Settings, SlidersHorizontal, Smile, Sun, TextSearch, ThumbsUp, User, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpToLine, Bookmark, Check, ChevronDown, ChevronRight, ChevronsUpDown, CircleHelp, Home, Maximize2, MessageCircle, Minus, Moon, MoreHorizontal, PanelTop, PencilLine, Pin, PinOff, RefreshCw, Search, Settings, SlidersHorizontal, Smile, Sun, TextSearch, ThumbsUp, User, X } from 'lucide-react';
 import { type Community, type Comment, type Post } from './data';
-import { api, desktop, errorOf, getCommunities, openOfficial, windowAction, type Account, type ApiError, type Bootstrap, type Detail } from './api';
+import { api, desktop, errorOf, getCommunities, openOfficial, setWindowAlwaysOnTop, windowAction, type Account, type ApiError, type Bootstrap, type Detail } from './api';
 import { useSaved, useFeed } from './useBackend';
 import { Avatar, Badges, CommunityIcon, ErrorNotice, LoginPanel, postTime } from './Online';
 import { fillHomeCommunities, mergeCommunities } from './community';
@@ -14,10 +14,11 @@ import { BlockedCommunitiesEditor } from './BlockedCommunitiesEditor';
 import { BlockedKeywordsEditor } from './BlockedKeywordsEditor';
 import { defaultPreferences, defaultCommunityFilter, defaultBlockedKeywords, defaultHomeCommunities, type Preferences, type Filter } from './settingsDefaults';
 import { AboutPanel } from './AboutPanel';
+import { ImageGallery } from './ImageGallery';
 
 type Page = '首页' | '我的收藏' | '浏览记录';
 
-function Modal({ title, subtitle, children, onClose, wide = false }: { title: string; subtitle?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+function Modal({ title, subtitle, children, onClose, wide = false, className = '' }: { title: string; subtitle?: string; children: ReactNode; onClose: () => void; wide?: boolean; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -35,7 +36,7 @@ function Modal({ title, subtitle, children, onClose, wide = false }: { title: st
     return () => { document.removeEventListener('keydown', onKey); previous?.focus(); };
   }, []);
   return <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className={`modal ${wide ? 'modal-wide' : ''}`} ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div className={`modal ${wide ? 'modal-wide' : ''} ${className}`} ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button" aria-label="关闭弹窗" onClick={onClose}><X size={19} /></button></div>
       {children}
     </div>
@@ -74,7 +75,7 @@ export default function App() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [randomCommunityPool, setRandomCommunityPool] = useState<Community[]>([]);
   const [randomCommunitySeed] = useState(() => Math.floor(Math.random() * 0x100000000));
-  const fixedHomeCommunities = (savedHomeCommunities ?? communities.slice(0, 7)).map(saved => {
+  const fixedHomeCommunities = (savedHomeCommunities ?? defaultHomeCommunities).map(saved => {
     const fresh = communities.find(c => c.id === saved.id);
     return fresh ? { ...fresh, icon: fresh.icon || saved.icon } : saved;
   });
@@ -95,7 +96,15 @@ export default function App() {
   const [modal, setModal] = useState<'settings' | 'user' | null>(null);
   const [settingsTab, setSettingsTab] = useState('外观');
   const [selected, setSelected] = useState<Post | null>(null);
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<{ images: string[]; index: number; title: string; postId: number } | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const isPhotoPost = selected?.kind === '图文' && selected.images.length > 0;
+  useEffect(() => { setGalleryIndex(0); }, [selected?.id]);
+  const openImage = (post: Post, index: number) => setImage({ images: [...post.images], index, title: post.title, postId: post.id });
+  const changeViewedImage = (index: number) => {
+    setImage(previous => previous ? { ...previous, index } : null);
+    if (image?.postId === selected?.id && isPhotoPost) setGalleryIndex(index);
+  };
   const [comments, setComments] = useState<Comment[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<ApiError | null>(null);
@@ -113,6 +122,17 @@ export default function App() {
   const [closed, setClosed] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [maximized, setMaximized] = useState(false);
+  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [pinPending, setPinPending] = useState(false);
+  const toggleWindowPin = async () => {
+    if (pinPending) return;
+    setPinPending(true);
+    try {
+      await setWindowAlwaysOnTop(!alwaysOnTop);
+      setAlwaysOnTop(previous => !previous);
+    } catch (error) { notify(errorOf(error).message); }
+    finally { setPinPending(false); }
+  };
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [systemDark, setSystemDark] = useState(window.matchMedia('(prefers-color-scheme: dark)').matches);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -303,6 +323,15 @@ export default function App() {
         return;
       }
       const target = event.target as HTMLElement;
+      if (!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        const direction = event.key === 'ArrowLeft' ? -1 : 1;
+        if (image && image.images.length > 1) {
+          event.preventDefault(); changeViewedImage(Math.max(0, Math.min(image.index + direction, image.images.length - 1))); return;
+        }
+        if (!modal && !profile && isPhotoPost && selected && selected.images.length > 1) {
+          event.preventDefault(); setGalleryIndex(index => Math.max(0, Math.min(Math.min(index, selected.images.length - 1) + direction, selected.images.length - 1))); return;
+        }
+      }
       if (target.closest('input, textarea, select, [contenteditable="true"]') || modal || image || profile || !prefs.shortcuts) return;
       if (matchesShortcut(event, keybindings.search)) { event.preventDefault(); searchRef.current?.focus(); }
       else if (matchesShortcut(event, keybindings.settings)) { event.preventDefault(); setModal('settings'); }
@@ -310,7 +339,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, image, profile, prefs.shortcuts, keybindings, selected?.id]);
+  }, [modal, image, profile, prefs.shortcuts, keybindings, selected?.id, selected?.images.length, isPhotoPost]);
 
   const theme = prefs.theme === 'system' ? (systemDark ? 'dark' : 'light') : prefs.theme;
   const toggle = (id: number, items: number[], update: (items: number[]) => void) => update(items.includes(id) ? items.filter(item => item !== id) : [...items, id]);
@@ -408,7 +437,7 @@ export default function App() {
             {menu && <><button className="menu-dismiss" tabIndex={-1} aria-label="收起菜单" onClick={() => setMenu(false)} /><nav className="page-dropdown">{([{ name: '首页', icon: Home }, { name: '我的收藏', icon: Bookmark }, { name: '浏览记录', icon: PanelTop }] as const).map(item => <button key={item.name} className={page === item.name ? 'selected' : ''} onClick={() => goPage(item.name)}><item.icon size={16} />{item.name}{page === item.name && <Check size={14} />}</button>)}</nav></>}
           </div>
           <div className="titlebar-search"><Search size={14} /><input ref={searchRef} aria-label="搜索帖子或社区" placeholder="搜索帖子、社区" value={search} onChange={e => { setSearch(e.target.value); setSelected(null); }} />{search ? <button aria-label="清空搜索" onClick={() => setSearch('')}><X size={13} /></button> : <kbd>{prefs.shortcuts ? shortcutLabel(keybindings.search) : ''}</kbd>}</div>
-          <div className="titlebar-right"><button className="icon-button" title="设置" aria-label="设置" onClick={() => setModal('settings')}><Settings size={18} /></button><button className="icon-button" title="用户" aria-label="用户" onClick={() => setModal('user')}>{account?.avatarUrl ? <img className="titlebar-avatar" src={account.avatarUrl} alt="当前用户头像" referrerPolicy="no-referrer" /> : <User size={18} />}</button><span className="titlebar-divider" /><button className="window-control" title="最小化" aria-label="最小化" onClick={() => desktop ? void windowAction('minimize').catch(error => notify(errorOf(error).message)) : setMinimized(true)}><Minus size={17} /></button><button className="window-control" title={maximized ? '还原窗口' : '最大化'} aria-label={maximized ? '还原窗口' : '最大化'} onClick={async () => { try { if (desktop) await windowAction('maximize'); setMaximized(previous => !previous); } catch (error) { notify(errorOf(error).message); } }}><Maximize2 size={13} /></button><button className="window-control close-control" title="关闭" aria-label="关闭窗口" onClick={() => desktop ? void closeWindow() : prefs.exit === 'tray' ? setMinimized(true) : setClosed(true)}><X size={18} /></button></div>
+          <div className="titlebar-right"><button className="icon-button" title="设置" aria-label="设置" onClick={() => setModal('settings')}><Settings size={18} /></button><button className="icon-button" title="用户" aria-label="用户" onClick={() => setModal('user')}>{account?.avatarUrl ? <img className="titlebar-avatar" src={account.avatarUrl} alt="当前用户头像" referrerPolicy="no-referrer" /> : <User size={18} />}</button><span className="titlebar-divider" /><button className={`window-control pin-control ${alwaysOnTop ? 'is-pinned' : ''}`} title={alwaysOnTop ? '取消窗口置顶' : '窗口置顶'} aria-label={alwaysOnTop ? '取消窗口置顶' : '窗口置顶'} aria-pressed={alwaysOnTop} disabled={pinPending} onClick={() => void toggleWindowPin()}>{alwaysOnTop ? <PinOff size={16} /> : <Pin size={16} />}</button><button className="window-control" title="最小化" aria-label="最小化" onClick={() => desktop ? void windowAction('minimize').catch(error => notify(errorOf(error).message)) : setMinimized(true)}><Minus size={17} /></button><button className="window-control" title={maximized ? '还原窗口' : '最大化'} aria-label={maximized ? '还原窗口' : '最大化'} onClick={async () => { try { if (desktop) await windowAction('maximize'); setMaximized(previous => !previous); } catch (error) { notify(errorOf(error).message); } }}><Maximize2 size={13} /></button><button className="window-control close-control" title="关闭" aria-label="关闭窗口" onClick={() => desktop ? void closeWindow() : prefs.exit === 'tray' ? setMinimized(true) : setClosed(true)}><X size={18} /></button></div>
         </header>
 
         <div className="content-scroll" ref={contentRef}>
@@ -416,11 +445,13 @@ export default function App() {
             <section className="feed-column">
               {selected ? <div className="post-detail">
                 <div className="detail-toolbar"><button className="back-button" onClick={leavePost}><ArrowLeft size={16} />返回</button></div>
+                {isPhotoPost && <ImageGallery images={selected.images} index={galleryIndex} title={selected.title} onChange={setGalleryIndex} onOpen={() => openImage(selected, Math.min(galleryIndex, selected.images.length - 1))} />}
                 <button className="author-line detail-author" aria-label={`查看 ${selected.author} 的主页`} onClick={() => void showProfile(selected)}><Avatar post={selected} /><div><strong>{selected.author}<Badges post={selected} /></strong><small>{postTime(selected)}</small></div></button>
-                <h1><RichText text={selected.title} /></h1>{topicBadges(selected)}
+                <h1><RichText text={selected.title} /></h1>{!isPhotoPost && topicBadges(selected)}
                 {detailLoading && !comments.length && <p className="loading-state" role="status">正在读取帖子与评论…</p>}
                 {detailError && !comments.length && <ErrorNotice error={detailError} retry={() => void requestDetail(selected.id, failedDetailPage.current)} login={() => setModal('user')} />}
-                <div className="post-body">{selected.body.map((p,index) => <p key={index}><RichText text={p} /></p>)}{selected.images.map((src, index) => <button className="detail-image" key={src} aria-label={`查看正文图片 ${index + 1}`} onClick={() => setImage(src)}><img src={src} alt={`${selected.title} 图片 ${index + 1}`} referrerPolicy="no-referrer" /></button>)}{selected.videoUrl && <video controls preload="none" src={selected.videoUrl} />}</div>
+                <div className="post-body">{selected.body.map((p,index) => <p key={index}><RichText text={p} /></p>)}{!isPhotoPost && selected.images.map((src, index) => <button className="detail-image" key={src} aria-label={`查看正文图片 ${index + 1}`} onClick={() => openImage(selected, index)}><img src={src} alt={`${selected.title} 图片 ${index + 1}`} referrerPolicy="no-referrer" /></button>)}{selected.videoUrl && <video controls preload="none" src={selected.videoUrl} />}</div>
+                {isPhotoPost && topicBadges(selected)}
                 {actions(selected)}<div className="comments-heading" ref={commentsRef}><h3>评论</h3><span>{selected.comments}</span><span className="comment-sort">热门评论</span></div>
                 {comments.map(comment => <CommentThread key={`${selected.id}:${comment.id}`} comment={comment} onReply={c => { setReplyTarget(c); document.getElementById('reply-input')?.focus(); }} onProfile={c => showPersonProfile(c.userId, c.author, c.avatarUrl, c.level)} onLogin={() => setModal('user')} />)}
                 {!detailLoading && !detailError && !comments.length && <p className="loading-state">还没有评论</p>}
@@ -439,7 +470,7 @@ export default function App() {
                 {search && <div className="search-summary">“{search}” 的搜索结果 <span>{visiblePosts.length} 篇</span></div>}
                 {feed.loading && !posts.length && <div className="loading-state" role="status">正在读取小黑盒社区…</div>}
                 {feed.error && !posts.length && <ErrorNotice error={feed.error} retry={feed.reload} login={() => setModal('user')} />}
-                <div className="post-list">{visiblePosts.map(post => <article className="post-card" key={post.id} onClick={event => { if (!(event.target as Element).closest('button, a, input, textarea, select, [role="button"]')) openPost(post); }}><button className="post-content" onClick={() => openPost(post)}><h2><RichText text={post.title} /></h2><p><RichText text={post.excerpt} /></p></button>{post.images.length > 0 && <div className={`post-images ${post.images.length === 1 ? 'single-image' : ''}`}>{post.images.slice(0, 3).map((src, index) => <button key={src} onClick={() => setImage(src)} aria-label={`查看 ${post.title} 的图片 ${index + 1}`}><img src={src} alt={`${post.title} 配图 ${index + 1}`} loading="lazy" referrerPolicy="no-referrer" /><span><Maximize2 size={14} /></span>{index === 2 && post.images.length > 3 && <span className="image-count">共{post.images.length}张</span>}</button>)}</div>}<div className="post-footer"><button className="author-line post-author" aria-label={`查看 ${post.author} 的资料`} onClick={() => void showProfile(post)}><Avatar post={post} /><div><strong><span className="author-name">{post.author}</span><Badges post={post} /></strong><small>{postTime(post)}{post.kind && <><span className="meta-dot">·</span>{post.kind}</>}</small></div></button><div className="post-footer-right">{topicBadges(post)}{actions(post)}</div></div></article>)}</div>
+                <div className="post-list">{visiblePosts.map(post => <article className="post-card" key={post.id} onClick={event => { if (!(event.target as Element).closest('button, a, input, textarea, select, [role="button"]')) openPost(post); }}><button className="post-content" onClick={() => openPost(post)}><h2><RichText text={post.title} /></h2><p><RichText text={post.excerpt} /></p></button>{post.images.length > 0 && <div className={`post-images ${post.images.length === 1 ? 'single-image' : ''}`}>{post.images.slice(0, 3).map((src, index) => <button key={src} onClick={() => openImage(post, index)} aria-label={`查看 ${post.title} 的图片 ${index + 1}`}><img src={src} alt={`${post.title} 配图 ${index + 1}`} loading="lazy" referrerPolicy="no-referrer" /><span><Maximize2 size={14} /></span>{index === 2 && post.images.length > 3 && <span className="image-count">共{post.images.length}张</span>}</button>)}</div>}<div className="post-footer"><button className="author-line post-author" aria-label={`查看 ${post.author} 的资料`} onClick={() => void showProfile(post)}><Avatar post={post} /><div><strong><span className="author-name">{post.author}</span><Badges post={post} /></strong><small>{postTime(post)}{post.kind && <><span className="meta-dot">·</span>{post.kind}</>}</small></div></button><div className="post-footer-right">{topicBadges(post)}{actions(post)}</div></div></article>)}</div>
                 {!feed.loading && !feed.error && !feed.hasMore && !visiblePosts.length && <div className="empty-state"><Search size={30} strokeWidth={1.3} /><h3>{page === '我的收藏' ? '把喜欢的帖子留在这里' : page === '浏览记录' ? '还没有浏览记录' : '没有符合条件的帖子'}</h3><p>{page === '我的收藏' ? '点击帖子下方的收藏，下次随时回来看看。' : page === '浏览记录' ? '打开一篇帖子后，会在这里留下记录。' : '换个搜索词，或在设置中检查社区与关键词屏蔽。'}</p><button className="secondary-button" onClick={() => page === '首页' ? (setSearch(''), setActiveCommunity(null)) : goPage('首页')}>{page === '首页' ? '返回推荐' : '去首页看看'}</button></div>}
                 {feed.error && posts.length > 0 && <ErrorNotice error={feed.error} retry={() => void feed.loadMore()} login={() => setModal('user')} />}
                 {page === '首页' && feed.hasMore && !feed.error && <div className="feed-end" ref={feedEndRef} role="status">{feed.loading ? '正在加载更多…' : '继续下滑加载更多'}</div>}{visiblePosts.length > 0 && !feed.hasMore && <div className="feed-end"><span />暂时看到这里<span /></div>}
@@ -461,7 +492,7 @@ export default function App() {
         {modal === 'user' && <Modal title="你的社区账号" onClose={() => setModal(null)}><LoginPanel account={account} onAccount={loginChanged} notify={notify} /></Modal>}
         {profile && <Modal title="盒友主页" wide onClose={() => setProfile(null)}><UserHome key={profile.id} initial={profile} onOpenPost={post => { setProfile(null); openPost(post); postOriginProfile.current = profile; }} onLogin={() => { setProfile(null); setModal('user'); }} /></Modal>}
 
-        {image && <Modal title="查看图片" wide onClose={() => setImage(null)}><img className="lightbox-image" src={image} alt="帖子配图大图" referrerPolicy="no-referrer" /></Modal>}
+        {image && <Modal title="查看图片" wide className="image-modal" onClose={() => setImage(null)}><ImageGallery images={image.images} index={image.index} title={image.title} onChange={changeViewedImage} expanded /></Modal>}
         {notice && <div className="toast" role="status"><Check size={15} />{notice}</div>}
       </div>
     </div>}

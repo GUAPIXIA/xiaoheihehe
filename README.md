@@ -6,7 +6,7 @@ Windows 第三方社区客户端，采用 Tauri 2、React、TypeScript、Rust �
 
 在 [下载与更新页](https://cjbtj.xyz/xiaoheihehe/) 获取最新 Windows x64 安装包。0.1.1 起可通过“设置 → 关于 → 检查更新”查看新版本并下载安装包；下载后退出程序，再运行安装包完成更新。
 
-发布流程与服务器维护见 [更新服务说明](docs/08-更新服务.md)。
+本次版本改动见 [更新日志](CHANGELOG.md)，发布流程与服务器维护见 [更新服务说明](docs/08-更新服务.md)。
 
 ## 界面预览
 
@@ -82,13 +82,15 @@ npm run desktop:build
 
 Windows 构建脚本自动寻找 MSVC 和 SDK，避免误用 Git 的同名链接工具。安装包生成于 `target/release/bundle/nsis/`。程序依赖系统 WebView2；缺少时由安装器下载运行时。
 
-发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.1_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
+发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.3_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
+
+安装器同时部署独立的 `shortcut-icon-rounded.ico`，桌面和开始菜单快捷方式使用该文件。安装或升级时保留快捷方式原有属性并通知 Windows 刷新图标；交互安装结束时再次处理，以覆盖完成页新建的桌面快捷方式。
 
 首次安装默认位置为 `D:\Apps\HeyboxCommunity`；D 盘不可用时采用当前用户目录。可在安装界面修改位置，升级保留原安装目录。
 
 ## 当前功能
 
-首次运行采用当前项目预设：跟随系统主题、125% 缩放、窗口基础宽 600px／高 1020px、隐藏右侧栏，开启动画和快捷键，关闭窗口时退出。首页固定 Steam、CS2、火影忍者，剩余 4 个位置每次启动随机补齐；社区与关键词屏蔽名单默认为空。已有的本地设置优先使用，不会被预设覆盖。
+首次运行采用当前项目预设：跟随系统主题、125% 缩放、窗口基础宽 600px／高 1020px、隐藏右侧栏，开启动画和快捷键，关闭窗口时退出。首页默认不固定社区，7 个位置每次启动随机补齐；社区与关键词屏蔽名单默认为空。已有的本地设置优先使用，不会被预设覆盖。
 
 - 真实推荐流、社区目录与在线社区搜索、帖子搜索，接近列表底部自动加载下一页；失败可重试。
 - 社区图标优先使用官方 `small_pic_url`，缺少时使用 `pic_url`；合并帖子和搜索结果补全缺图，加载失败显示社区首字占位。
