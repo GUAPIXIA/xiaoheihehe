@@ -22,8 +22,8 @@ export interface Filter {
 
 // Project defaults captured from the user's saved settings. Existing saved values take priority.
 export const defaultPreferences: Preferences = {
-  theme: 'system', zoom: 125, exit: 'close', shortcuts: true,
-  animations: true, showSidebar: false, windowHeight: 1020, windowWidth: 600,
+  theme: 'system', zoom: 100, exit: 'close', shortcuts: true,
+  animations: true, showSidebar: false, windowHeight: 1020, windowWidth: 640,
 };
 
 export const defaultCommunityFilter: Filter = {

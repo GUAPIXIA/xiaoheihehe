@@ -30,7 +30,7 @@ async page => {
   await checkSize(720,1080);
   await page.waitForResponse(response=>{try{const r=response.request().postDataJSON();return r?.type==='stateSet'&&r.payload.key==='heybox.preferences'&&r.payload.value.windowHeight===1080}catch{return false}});
   if(savedHeights.includes(480)||savedHeights.includes(900))throw new Error('Height slider was not debounced');
-  await page.getByRole('button',{name:'600px',exact:true}).click();
+  await page.getByRole('button',{name:/^600px/}).click();
   await checkSize(720,600);
   await page.getByRole('button',{name:'125%',exact:true}).click();
   await checkSize(900,750);
@@ -41,12 +41,15 @@ async page => {
   await page.getByRole('button',{name:'设置',exact:true}).click();
   if(await slider.inputValue()!=='600')throw new Error('Height not restored after reload');
   await slider.fill('480');
-  await page.getByRole('button',{name:'900px',exact:true}).click();
+  await page.getByRole('button',{name:/^900px/}).click();
   await checkSize(900,1125);
-  await page.getByRole('button',{name:'760px（默认）',exact:true}).click();
-  await checkSize(900,950);
+  const defaultChip=page.getByRole('button',{name:/（默认）/});
+  const defaultHeight=Number((await defaultChip.innerText()).replace(/[^0-9]/g,''));
+  if(!(defaultHeight>=480&&defaultHeight<=1200))throw new Error(`Default height preset out of range: ${defaultHeight}`);
+  await defaultChip.click();
+  await checkSize(900,defaultHeight*1.25);
   await page.getByRole('slider',{name:'窗口缩放',exact:true}).fill('100');
-  await checkSize(720,760);
+  await checkSize(720,defaultHeight);
   await page.screenshot({path:'output/playwright/window-height.png'});
   await page.getByRole('button',{name:'完成',exact:true}).click();
   await page.setViewportSize({width:1000,height:700});

@@ -5,7 +5,7 @@ import { api, desktop, errorOf, getCommunities, openOfficial, setWindowAlwaysOnT
 import { useSaved, useFeed } from './useBackend';
 import { Avatar, Badges, CommunityIcon, ErrorNotice, LoginPanel, postTime } from './Online';
 import { fillHomeCommunities, mergeCommunities } from './community';
-import { CommentThread } from './CommentThread';
+import { CommentThread, commentImages } from './CommentThread';
 import { UserHome } from './UserHome';
 import { EmojiPicker, RichText } from './Emoji';
 import { matchesShortcut, resolveKeybindings, shortcutLabel, ShortcutsEditor } from './Shortcuts';
@@ -96,14 +96,20 @@ export default function App() {
   const [modal, setModal] = useState<'settings' | 'user' | null>(null);
   const [settingsTab, setSettingsTab] = useState('外观');
   const [selected, setSelected] = useState<Post | null>(null);
-  const [image, setImage] = useState<{ images: string[]; index: number; title: string; postId: number } | null>(null);
+  const [image, setImage] = useState<{ images: string[]; index: number; title: string; heading: string; postId?: number; source: 'post' | 'comment' } | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const isPhotoPost = selected?.kind === '图文' && selected.images.length > 0;
   useEffect(() => { setGalleryIndex(0); }, [selected?.id]);
-  const openImage = (post: Post, index: number) => setImage({ images: [...post.images], index, title: post.title, postId: post.id });
+  const openImage = (post: Post, index: number) => setImage({ images: [...post.images], index, title: post.title, heading: '查看图片', postId: post.id, source: 'post' });
+  const openCommentImage = (comment: Comment, index: number) => {
+    const images = commentImages(comment);
+    if (!images.length) return;
+    setImage({ images, index: Math.max(0, Math.min(index, images.length - 1)), title: comment.author, heading: `${comment.author} 的评论图片`, source: 'comment' });
+  };
   const changeViewedImage = (index: number) => {
     setImage(previous => previous ? { ...previous, index } : null);
-    if (image?.postId === selected?.id && isPhotoPost) setGalleryIndex(index);
+    // Only the post's own photo gallery syncs galleryIndex; comment images never touch it.
+    if (image?.source === 'post' && image.postId === selected?.id && isPhotoPost) setGalleryIndex(index);
   };
   const [comments, setComments] = useState<Comment[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -453,7 +459,7 @@ export default function App() {
                 <div className="post-body">{selected.body.map((p,index) => <p key={index}><RichText text={p} /></p>)}{!isPhotoPost && selected.images.map((src, index) => <button className="detail-image" key={src} aria-label={`查看正文图片 ${index + 1}`} onClick={() => openImage(selected, index)}><img src={src} alt={`${selected.title} 图片 ${index + 1}`} referrerPolicy="no-referrer" /></button>)}{selected.videoUrl && <video controls preload="none" src={selected.videoUrl} />}</div>
                 {isPhotoPost && topicBadges(selected)}
                 {actions(selected)}<div className="comments-heading" ref={commentsRef}><h3>评论</h3><span>{selected.comments}</span><span className="comment-sort">热门评论</span></div>
-                {comments.map(comment => <CommentThread key={`${selected.id}:${comment.id}`} comment={comment} onReply={c => { setReplyTarget(c); document.getElementById('reply-input')?.focus(); }} onProfile={c => showPersonProfile(c.userId, c.author, c.avatarUrl, c.level)} onLogin={() => setModal('user')} />)}
+                {comments.map(comment => <CommentThread key={`${selected.id}:${comment.id}`} comment={comment} onReply={c => { setReplyTarget(c); document.getElementById('reply-input')?.focus(); }} onProfile={c => showPersonProfile(c.userId, c.author, c.avatarUrl, c.level)} onLogin={() => setModal('user')} onImage={openCommentImage} />)}
                 {!detailLoading && !detailError && !comments.length && <p className="loading-state">还没有评论</p>}
                 {detailError && comments.length > 0 && <ErrorNotice error={detailError} retry={() => void requestDetail(selected.id, failedDetailPage.current)} login={() => setModal('user')} />}
                 {moreComments && !detailError && <div className="feed-end comments-end" ref={commentsEndRef} role="status">{detailLoading ? '正在加载更多评论…' : '继续下滑加载更多评论'}</div>}
@@ -492,7 +498,7 @@ export default function App() {
         {modal === 'user' && <Modal title="你的社区账号" onClose={() => setModal(null)}><LoginPanel account={account} onAccount={loginChanged} notify={notify} /></Modal>}
         {profile && <Modal title="盒友主页" wide onClose={() => setProfile(null)}><UserHome key={profile.id} initial={profile} onOpenPost={post => { setProfile(null); openPost(post); postOriginProfile.current = profile; }} onLogin={() => { setProfile(null); setModal('user'); }} /></Modal>}
 
-        {image && <Modal title="查看图片" wide className="image-modal" onClose={() => setImage(null)}><ImageGallery images={image.images} index={image.index} title={image.title} onChange={changeViewedImage} expanded /></Modal>}
+        {image && <Modal title={image.heading} wide className="image-modal" onClose={() => setImage(null)}><ImageGallery images={image.images} index={image.index} title={image.title} label={image.source === 'comment' ? '评论图片' : '帖子图片'} onChange={changeViewedImage} expanded /></Modal>}
         {notice && <div className="toast" role="status"><Check size={15} />{notice}</div>}
       </div>
     </div>}

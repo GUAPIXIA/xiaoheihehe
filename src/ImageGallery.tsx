@@ -163,8 +163,8 @@ function GalleryImage({ src, alt, onOpen }: { src: string; alt: string; onOpen?:
   </>;
 }
 
-export function ImageGallery({ images, index, title, onChange, onOpen, expanded = false }: {
-  images: string[]; index: number; title: string; onChange: (index: number) => void; onOpen?: () => void; expanded?: boolean;
+export function ImageGallery({ images, index, title, label = '帖子图片', onChange, onOpen, expanded = false }: {
+  images: string[]; index: number; title: string; label?: string; onChange: (index: number) => void; onOpen?: () => void; expanded?: boolean;
 }) {
   if (!images.length) return null;
   const current = Math.max(0, Math.min(index, images.length - 1));
@@ -173,7 +173,7 @@ export function ImageGallery({ images, index, title, onChange, onOpen, expanded 
     <span className="gallery-count" role="status" aria-live="polite" aria-atomic="true">{current + 1}/{images.length}</span>
     {images.length > 1 && <button className="gallery-arrow gallery-next" aria-label="下一张图片" title="下一张图片（→）" disabled={current === images.length - 1} onClick={() => onChange(current + 1)}><ChevronRight size={22} /></button>}
   </>;
-  return <div className={`image-gallery ${expanded ? 'image-gallery-expanded' : ''}`} role="region" aria-label="帖子图片">
+  return <div className={`image-gallery ${expanded ? 'image-gallery-expanded' : ''}`} role="region" aria-label={label}>
     {expanded ? <ExpandedImage key={`${current}:${images[current]}`} src={images[current]} alt={`${title} 图片 ${current + 1}`} navigation={navigation} /> : <><GalleryImage key={images[current]} src={images[current]} alt={`${title} 图片 ${current + 1}`} onOpen={onOpen} />{navigation}</>}
   </div>;
 }

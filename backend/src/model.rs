@@ -328,6 +328,60 @@ impl Filter {
         self.mode != "include" || p.topic_ids.iter().any(|id| self.included.contains(id))
     }
 }
+// Upstream comment images arrive in several shapes: an object array (url/thumb/src),
+// a string array, or one `;`-separated string produced by the web editor.
+fn collect_image_candidates(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_image_candidates(item, out);
+            }
+        }
+        Value::Object(map) => {
+            let picked = ["url", "thumb", "src", "img", "pic"]
+                .iter()
+                .find_map(|key| map.get(*key).map(text).filter(|s| !s.is_empty()));
+            if let Some(found) = picked {
+                out.push(found);
+            }
+        }
+        Value::String(s) => out.extend(
+            s.split(';')
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .map(str::to_owned),
+        ),
+        _ => (),
+    }
+}
+fn comment_images(v: &Value) -> Vec<String> {
+    let mut candidates = vec![];
+    collect_image_candidates(&v["imgs"], &mut candidates);
+    let mut images: Vec<String> = candidates
+        .iter()
+        .map(|s| image_url(&Value::String(s.clone())))
+        .filter(|url| !url.is_empty())
+        .collect();
+    if images.is_empty() {
+        // Some payloads inline images in the comment HTML instead of `imgs`.
+        let html = first(v, &["text", "content"]);
+        if !html.is_empty() {
+            let document = Html::parse_fragment(&html);
+            for node in document.select(&Selector::parse("img[src]").unwrap()) {
+                if let Some(src) = node.value().attr("src") {
+                    let url = image_url(&Value::String(src.into()));
+                    if !url.is_empty() {
+                        images.push(url);
+                    }
+                }
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    images.retain(|url| seen.insert(url.clone()));
+    images
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Comment {
@@ -338,6 +392,8 @@ pub struct Comment {
     pub avatar: String,
     pub avatar_url: String,
     pub text: String,
+    #[serde(default)]
+    pub images: Vec<String>,
     pub likes: u64,
     pub time: String,
     pub root_id: u64,
@@ -387,6 +443,7 @@ fn comment(v: &Value, root: Option<u64>) -> Option<Comment> {
         author: name,
         avatar_url: image_url(&Value::String(first(user, &["avatar", "avartar"]))),
         text: plain_text(&first(v, &["text", "content"])),
+        images: comment_images(v),
         likes: number(&v["up"]).max(number(&v["support_num"])),
         time: first(v, &["formated_time", "formatted_time"]),
         root_id: root.unwrap_or_else(|| match number(&v["root_id"]) {
@@ -592,5 +649,76 @@ mod tests {
         let result = serde_json::json!({"comments":[{"commentid":200,"root_id":100,"text":"reply","user":{"username":"user"}}]});
         let normalized = comments(&result);
         assert_eq!(normalized[0].root_id, 100);
+    }
+    #[test]
+    fn comment_images_decode_object_string_and_separator_shapes() {
+        // First entry mirrors the real payload of post 194082427 commentid 977357367.
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[
+            {"commentid":977357367,"user":{"username":"猫饼虾"},"text":"我这哥布林工匠还有四颗魔丸守护[cube_惊讶]",
+             "imgs":[{"height":1080,"mimetype":"image/jpeg","width":1920,"thumb":"https://example.com/both.jpeg","url":"https://example.com/both.jpeg"}]},
+            {"commentid":2,"user":{"username":"b"},"text":"只有缩略图","imgs":[{"height":1,"mimetype":"image/webp","thumb":"//example.com/thumb.webp"}]},
+            {"commentid":3,"user":{"username":"c"},"text":"字符串数组","imgs":["https://example.com/three.png"]},
+            {"commentid":4,"user":{"username":"d"},"text":"分号字符串","imgs":"//example.com/four.png; https://example.com/five.png ;"}
+        ]}))).unwrap();
+        assert_eq!(
+            list[0]["images"],
+            serde_json::json!(["https://example.com/both.jpeg"])
+        );
+        assert_eq!(
+            list[0]["text"],
+            "我这哥布林工匠还有四颗魔丸守护[cube_惊讶]"
+        );
+        assert_eq!(
+            list[1]["images"],
+            serde_json::json!(["https://example.com/thumb.webp"])
+        );
+        assert_eq!(
+            list[2]["images"],
+            serde_json::json!(["https://example.com/three.png"])
+        );
+        assert_eq!(
+            list[3]["images"],
+            serde_json::json!([
+                "https://example.com/four.png",
+                "https://example.com/five.png"
+            ])
+        );
+    }
+    #[test]
+    fn comment_images_drop_insecure_and_duplicate_urls() {
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[{
+            "commentid":10,"user":{"username":"a"},"text":"去重",
+            "imgs":[{"url":"https://example.com/a.png"},{"thumb":"https://example.com/a.png"},{"src":"http://example.com/b.png"},{"url":"javascript:alert(1)"}]
+        }]})))
+        .unwrap();
+        assert_eq!(list[0]["images"], serde_json::json!(["https://example.com/a.png"]));
+    }
+    #[test]
+    fn comment_images_fall_back_to_inline_html_without_leaking_markup() {
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[
+            {"commentid":20,"user":{"username":"a"},"text":"<p>看这个</p><img src='//example.com/inline.png'><script>unsafe()</script>"},
+            {"commentid":21,"user":{"username":"b"},"text":"<img src='https://example.com/kept.png'>","imgs":[{"url":"http://example.com/rejected.png"}]}
+        ]}))).unwrap();
+        assert_eq!(
+            list[0]["images"],
+            serde_json::json!(["https://example.com/inline.png"])
+        );
+        assert_eq!(list[0]["text"], "看这个");
+        assert_eq!(
+            list[1]["images"],
+            serde_json::json!(["https://example.com/kept.png"])
+        );
+    }
+    #[test]
+    fn comment_images_absent_key_yields_empty_list() {
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[
+            {"commentid":30,"user":{"username":"a"},"text":"没有图"},
+            {"commentid":31,"user":{"username":"b"},"text":"子评论","replyuser":{"username":"x"}}
+        ]}))).unwrap();
+        assert_eq!(list[0]["images"], serde_json::json!([]));
+        assert_eq!(list[1]["images"], serde_json::json!([]));
+        // Older cached JSON without the field must still deserialize.
+        let legacy: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
+        assert!(legacy.images.is_empty());
     }
 }

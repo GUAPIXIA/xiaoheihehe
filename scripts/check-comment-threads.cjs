@@ -17,6 +17,7 @@ async (page) => {
       case 'communities': data = []; break;
       case 'feed': data = { posts: [post], cursor: { offset: 30, topics: {}, exhausted: [], rotation: 0 }, hasMore: false }; break;
       case 'detail': data = {post, comments:[root, other], page:1, hasMore:false, isCy:false}; break;
+      case 'emojis': data = {version:'synthetic',emojis:[]}; break;
       case 'subComments': {
         if (request.payload.root !== 100) throw new Error('Wrong root requested');
         cursors.push(request.payload.lastval);
@@ -62,7 +63,7 @@ async (page) => {
   await page.getByText('评论已发送', {exact:true}).waitFor();
   if (submission.root !== 100 || submission.reply !== 106) throw new Error('Reply/root association incorrect');
   await page.screenshot({path:'output/playwright/comment-threads.png'});
-  await page.getByRole('button', {name:'返回信息流'}).click();
+  await page.getByRole('button', {name:'返回',exact:true}).click();
   if (errors.length) throw new Error(errors.join(';'));
   return {pinned:true,levels:true,previews:true,pagination:true,deduplication:true,collapse:true,retryPreservesCursor:true,replyRoot:true};
 }

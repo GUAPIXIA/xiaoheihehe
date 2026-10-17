@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('Test','DesktopTest','Backend','Desktop','Build','Check','AvatarCheck','ContentCheck','UserHomeCheck','EmojiCheck','CommunityIconCheck')][string]$Mode = 'Test',
+  [ValidateSet('Test','DesktopTest','Backend','Desktop','Build','Check','AvatarCheck','ContentCheck','UserHomeCheck','EmojiCheck','CommunityIconCheck','CommentImageCheck')][string]$Mode = 'Test',
   [string]$ConfigPath,
   [switch]$CheckOnly
 )
@@ -32,6 +32,7 @@ switch ($Mode) {
   'UserHomeCheck' { & cargo run -p heybox-backend --example check_user_home }
   'EmojiCheck' { & cargo run -p heybox-backend --example check_emojis }
   'CommunityIconCheck' { & cargo run -p heybox-backend --example check_community_icons }
+  'CommentImageCheck' { & cargo run -p heybox-backend --example check_comment_images }
   'Desktop' {
     if ($ConfigPath) { & npm exec -- tauri dev --config $ConfigPath }
     else { & npm exec -- tauri dev }

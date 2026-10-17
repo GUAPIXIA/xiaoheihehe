@@ -6,7 +6,7 @@ export interface Post {
   level: number; medalUrl: string; medalName: string; liked: boolean; createdAt: number; videoUrl: string; isCy: boolean;
 }
 export interface Comment {
-  id: number; userId: string; author: string; avatar: string; avatarUrl: string; text: string; likes: number; time: string; rootId: number;
+  id: number; userId: string; author: string; avatar: string; avatarUrl: string; text: string; images: string[]; likes: number; time: string; rootId: number;
   level: number; medalUrl: string; medalName: string; pinned: boolean; isAuthor: boolean; createdAt: number;
   replyTo: string; replyCount: number; hasMoreReplies: boolean; replies: Comment[];
 }
