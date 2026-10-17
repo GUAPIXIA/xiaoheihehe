@@ -68,11 +68,11 @@ export function CommentThread({ comment, onReply, onProfile, onLogin, onImage }:
   return <div className={`comment ${comment.pinned ? 'pinned-comment' : ''}`}>
     {comment.pinned && <span className="comment-pin" title="置顶评论"><span>置顶</span></span>}
     <button className="avatar small-avatar" aria-label={`查看 ${comment.author} 的主页头像`} onClick={() => onProfile(comment)}>{comment.avatarUrl ? <img src={comment.avatarUrl} alt="" referrerPolicy="no-referrer" /> : comment.avatar}</button>
-    <div className="comment-content">{author(comment)}<p><RichText text={comment.text} /></p><CommentImages comment={comment} onImage={onImage} /><small>{postTime(comment)}<button onClick={() => onReply(comment)}>回复</button></small>
+    <div className="comment-content">{author(comment)}<p><RichText text={comment.text} /></p><CommentImages comment={comment} onImage={onImage} /><small>{postTime(comment)}{comment.ipLocation?.trim() && <><span className="meta-dot">·</span><span className="ip-location">{comment.ipLocation}</span></>}<button onClick={() => onReply(comment)}>回复</button></small>
       {(replies.length > 0 || comment.replyCount > 0 || hasMore) && <div className="comment-replies">
         {(expanded ? replies : replies.slice(0, 2)).map(c => <div className="sub-comment" key={c.id}>
           {author(c)}{c.replyTo && <span className="reply-to"> 回复 {c.replyTo}</span>}<p><RichText text={c.text} /></p><CommentImages comment={c} onImage={onImage} />
-          <small>{postTime(c)}<button onClick={() => onReply(c)}>回复</button><span className="sub-comment-likes"><ThumbsUp size={11} />{c.likes}</span></small>
+          <small>{postTime(c)}{c.ipLocation?.trim() && <><span className="meta-dot">·</span><span className="ip-location">{c.ipLocation}</span></>}<button onClick={() => onReply(c)}>回复</button><span className="sub-comment-likes"><ThumbsUp size={11} />{c.likes}</span></small>
         </div>)}
         {error && <ErrorNotice error={error} retry={() => void loadReplies()} login={onLogin} />}
         <div className="reply-navigation">

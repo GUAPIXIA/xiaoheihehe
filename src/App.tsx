@@ -452,7 +452,7 @@ export default function App() {
               {selected ? <div className="post-detail">
                 <div className="detail-toolbar"><button className="back-button" onClick={leavePost}><ArrowLeft size={16} />返回</button></div>
                 {isPhotoPost && <ImageGallery images={selected.images} index={galleryIndex} title={selected.title} onChange={setGalleryIndex} onOpen={() => openImage(selected, Math.min(galleryIndex, selected.images.length - 1))} />}
-                <button className="author-line detail-author" aria-label={`查看 ${selected.author} 的主页`} onClick={() => void showProfile(selected)}><Avatar post={selected} /><div><strong>{selected.author}<Badges post={selected} /></strong><small>{postTime(selected)}</small></div></button>
+                <button className="author-line detail-author" aria-label={`查看 ${selected.author} 的主页`} onClick={() => void showProfile(selected)}><Avatar post={selected} /><div><strong>{selected.author}<Badges post={selected} /></strong><small>{postTime(selected)}{selected.ipLocation?.trim() && <><span className="meta-dot">·</span><span className="ip-location">{selected.ipLocation}</span></>}</small></div></button>
                 <h1><RichText text={selected.title} /></h1>{!isPhotoPost && topicBadges(selected)}
                 {detailLoading && !comments.length && <p className="loading-state" role="status">正在读取帖子与评论…</p>}
                 {detailError && !comments.length && <ErrorNotice error={detailError} retry={() => void requestDetail(selected.id, failedDetailPage.current)} login={() => setModal('user')} />}

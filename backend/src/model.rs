@@ -155,6 +155,8 @@ pub struct Post {
     pub kind: String,
     pub video_url: String,
     pub is_cy: bool,
+    #[serde(default)]
+    pub ip_location: String,
 }
 pub fn plain_text(input: &str) -> String {
     let document = Html::parse_fragment(input);
@@ -295,6 +297,8 @@ pub fn post(v: &Value) -> Option<Post> {
         .into(),
         video_url: image_url(&v["video_url"]),
         is_cy: yes(&v["is_cy"]),
+        // Trim here: a whitespace-only location must not render a bare separator on the client.
+        ip_location: first(v, &["ip_location"]).trim().to_owned(),
     })
 }
 pub fn posts(result: &Value) -> Vec<Post> {
@@ -417,6 +421,8 @@ pub struct Comment {
     pub has_more_replies: bool,
     #[serde(default)]
     pub replies: Vec<Comment>,
+    #[serde(default)]
+    pub ip_location: String,
 }
 fn comment(v: &Value, root: Option<u64>) -> Option<Comment> {
     let id = number(&v["commentid"]).max(number(&v["comment_id"]));
@@ -465,6 +471,7 @@ fn comment(v: &Value, root: Option<u64>) -> Option<Comment> {
         reply_count: number(&v["child_num"]),
         has_more_replies: yes(&v["has_more"]),
         replies: vec![],
+        ip_location: first(v, &["ip_location"]).trim().to_owned(),
     })
 }
 pub fn comments(result: &Value) -> Vec<Comment> {
@@ -720,5 +727,33 @@ mod tests {
         // Older cached JSON without the field must still deserialize.
         let legacy: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
         assert!(legacy.images.is_empty());
+    }
+    #[test]
+    fn post_and_comment_ip_location_are_kept() {
+        let plain_post = serde_json::to_value(post(&serde_json::json!({
+            "linkid":194082427,"user":{"username":"盒友"},"title":"泰拉梗图","ip_location":"福建"
+        })))
+        .unwrap();
+        assert_eq!(plain_post["ipLocation"], "福建");
+        let blank_post = serde_json::to_value(post(&serde_json::json!({
+            "linkid":2,"user":{"username":"盒友"},"title":"空白属地","ip_location":"  "
+        })))
+        .unwrap();
+        assert_eq!(blank_post["ipLocation"], "");
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[
+            {"commentid":977357367,"user":{"username":"猫饼虾"},"text":"主评论","ip_location":"江苏"},
+            {"commentid":2,"user":{"username":"b"},"text":"子评论","replyuser":{"username":"x"},"ip_location":"内蒙古"},
+            {"commentid":3,"user":{"username":"c"},"text":"无属地"},
+            {"commentid":4,"user":{"username":"d"},"text":"空白属地","ip_location":" "}
+        ]}))).unwrap();
+        assert_eq!(list[0]["ipLocation"], "江苏");
+        assert_eq!(list[1]["ipLocation"], "内蒙古");
+        assert_eq!(list[2]["ipLocation"], "");
+        assert_eq!(list[3]["ipLocation"], "");
+        // Older cached JSON without the field must still deserialize.
+        let legacy_post: Post = serde_json::from_value(serde_json::json!({"id":1,"userId":"1","author":"a","avatar":"a","avatarUrl":"","color":"","time":"","title":"t","excerpt":"","body":[],"topicIds":[],"topics":[],"likes":0,"comments":0,"images":[],"level":0,"medalUrl":"","medalName":"","liked":false,"followed":false,"createdAt":0,"kind":"讨论","videoUrl":"","isCy":false})).unwrap();
+        assert!(legacy_post.ip_location.is_empty());
+        let legacy_comment: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
+        assert!(legacy_comment.ip_location.is_empty());
     }
 }
