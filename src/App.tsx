@@ -119,10 +119,31 @@ export default function App() {
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [sending, setSending] = useState(false);
   const [pendingLike, setPendingLike] = useState<number | null>(null);
+  const pendingCommentLike = useRef(new Set<number>());
   const [onlineRefresh, setOnlineRefresh] = useState(0);
   const [reply, setReply] = useState('');
+  const [replyFocusTick, setReplyFocusTick] = useState(0);
+  const replyFocusPending = useRef(false);
+  const [replyFocused, setReplyFocused] = useState(false);
+  const replyFocusedRef = useRef(false);
   const [emojiPicker, setEmojiPicker] = useState(false);
   const replyRef = useRef<HTMLTextAreaElement>(null);
+  const replyFormRef = useRef<HTMLFormElement>(null);
+  const [composerDocked, setComposerDocked] = useState(false);
+  const composerTriggerRef = useRef<HTMLElement | null>(null);
+  // Ends the composer's focus pause (used when the reply flow is finished or cancelled, where the
+  // browser may not fire a usable blur, e.g. the focused submit button becoming disabled).
+  const releaseReplyFocus = () => {
+    replyFocusedRef.current = false; setReplyFocused(false);
+    if (replyFormRef.current?.contains(document.activeElement)) (document.activeElement as HTMLElement | null)?.blur();
+  };
+  // Leaves the floating composer (S1 -> S0) without touching the draft, handing focus back to the
+  // element that revealed it when it is still in the document.
+  const collapseComposer = () => {
+    setComposerDocked(false);
+    const trigger = composerTriggerRef.current;
+    if (trigger?.isConnected) trigger.focus();
+  };
   const replySelection = useRef({start:0,end:0});
   const [notice, setNotice] = useState('');
   const [closed, setClosed] = useState(false);
@@ -235,7 +256,7 @@ export default function App() {
         const ids = new Set(base.map(c => c.id));
         return [...base, ...result.comments.filter(c => !ids.has(c.id) && !!ids.add(c.id))];
       });
-      setCommentPage(pageNumber); setMoreComments(result.hasMore && pageNumber < 1000);
+      setCommentPage(pageNumber); setMoreComments(result.hasMore && pageNumber < 1000); loadedDetail.current = id;
     } catch (error) {
       if (detailRequest.current === id && !controller.signal.aborted && detailController.current === controller) {
         failedDetailPage.current = pageNumber; setDetailError(errorOf(error));
@@ -247,16 +268,20 @@ export default function App() {
   const detailRequest = useRef<number | null>(null);
   const detailController = useRef<AbortController | null>(null);
   const failedDetailPage = useRef(1);
+  const loadedDetail = useRef<number | null>(null);
   useEffect(() => {
-    detailController.current?.abort(); detailController.current = null;
-    detailRequest.current = selected?.id ?? null; setComments([]); setCommentPage(1); setMoreComments(false); setDetailLoading(false); setDetailError(null); setReplyTarget(null); setEmojiPicker(false);
+    detailController.current?.abort(); detailController.current = null; loadedDetail.current = null;
+    detailRequest.current = selected?.id ?? null; setComments([]); setCommentPage(1); setMoreComments(false); setDetailLoading(false); setDetailError(null); setReplyTarget(null); setEmojiPicker(false); setReplyFocused(false); replyFocusedRef.current = false; setComposerDocked(false); composerTriggerRef.current = null;
     if (selected) void requestDetail(selected.id);
     return () => { detailController.current?.abort(); detailController.current = null; detailRequest.current = null; };
   }, [selected?.id, onlineRefresh]);
   const loadCommentsRef = useRef<() => void>(() => {});
-  loadCommentsRef.current = () => { if (selected && moreComments && !detailError) void requestDetail(selected.id, commentPage + 1); };
+  // Replying (reply target, or the composer holding focus) pauses auto-pagination: an incoming page
+  // would push the box the user is typing into out of view. The ref mirrors the state so the check is
+  // still correct if the observer's first callback lands before React re-renders.
+  loadCommentsRef.current = () => { if (selected && moreComments && !detailError && !replyTarget && !replyFocusedRef.current) void requestDetail(selected.id, commentPage + 1); };
   useEffect(() => {
-    if (!selected || modal || image || profile || closed || minimized || sending || detailLoading || detailError || !moreComments) return;
+    if (!selected || modal || image || profile || closed || minimized || sending || detailLoading || detailError || !moreComments || replyTarget || replyFocused) return;
     const root = contentRef.current, target = commentsEndRef.current;
     if (!root || !target) return;
     const observer = new IntersectionObserver(entries => {
@@ -264,7 +289,47 @@ export default function App() {
     }, { root, rootMargin: '0px 0px 180px 0px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [selected?.id, modal, image, profile, closed, minimized, sending, detailLoading, detailError, moreComments, commentPage]);
+  }, [selected?.id, modal, image, profile, closed, minimized, sending, detailLoading, detailError, moreComments, commentPage, replyTarget, replyFocused]);
+  // The reply form lives at the end of the comment list, so the floating controls only need to move
+  // while it is actually on screen; otherwise the lift stays 0px and they keep their base position.
+  useEffect(() => {
+    const form = replyFormRef.current, scroll = contentRef.current;
+    if (!form) return;
+    let visible = false;
+    const sync = () => {
+      const inner = form.closest('.window-inner');
+      const clearsControls = inner ? form.getBoundingClientRect().right <= inner.getBoundingClientRect().right - 84 : false;
+      document.documentElement.style.setProperty('--reply-dock-lift', visible && !clearsControls ? `${form.offsetHeight + 50}px` : '0px');
+    };
+    const resize = new ResizeObserver(sync);
+    resize.observe(form);
+    const intersection = scroll ? new IntersectionObserver(entries => {
+      visible = entries.some(entry => entry.isIntersecting);
+      sync();
+    }, { root: scroll }) : null;
+    intersection?.observe(form);
+    sync();
+    return () => { resize.disconnect(); intersection?.disconnect(); document.documentElement.style.removeProperty('--reply-dock-lift'); };
+  }, [selected?.id]);
+  // Reveal + focus the composer for an explicit reply request (post comment button or a comment's 回复).
+  // Wait for this post's comments to render first. Not visible -> dock it (sticky bottom, no page
+  // scroll); already visible -> only focus, never change its position.
+  useEffect(() => {
+    if (!replyFocusPending.current) return;
+    if (selected && loadedDetail.current !== selected.id && !detailError) return;
+    const input = replyRef.current, form = replyFormRef.current, scroll = contentRef.current;
+    if (!input || !form) return;
+    replyFocusPending.current = false;
+    const box = input.getBoundingClientRect(), bounds = scroll?.getBoundingClientRect();
+    const fullyVisible = !!bounds && box.top >= bounds.top - 1 && box.bottom <= bounds.bottom + 1;
+    if (!fullyVisible) setComposerDocked(true);
+    input.focus({ preventScroll: true });
+  }, [replyFocusTick, detailLoading, detailError, comments.length]);
+  // An opened emoji panel makes the composer taller; keep the whole panel inside the viewport.
+  useEffect(() => {
+    if (!emojiPicker) return;
+    replyFormRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [emojiPicker]);
   const loginChanged = (next: Account | null) => { setAccount(next); setOnlineRefresh(n => n + 1); };
   const likePost = async (post: Post) => {
     if (!account) { setModal('user'); return; }
@@ -273,14 +338,36 @@ export default function App() {
     catch (error) { notify(errorOf(error).message); if (errorOf(error).code === 'login') { setAccount(null); setModal('user'); } }
     finally { setPendingLike(null); }
   };
+  const likeComment = async (comment: Comment) => {
+    if (!account) { setModal('user'); return; }
+    if (pendingCommentLike.current.has(comment.id)) return;
+    const liked = !comment.supported;
+    pendingCommentLike.current.add(comment.id);
+    setComments(previous => previous.map(item => item.id === comment.id ? { ...item, supported: liked, likes: Math.max(0, item.likes + (liked ? 1 : -1)) } : item));
+    try { await api('likeComment', { id: comment.id, liked }); }
+    catch (error) {
+      setComments(previous => previous.map(item => item.id === comment.id ? { ...item, supported: !!comment.supported, likes: comment.likes } : item));
+      notify(errorOf(error).message);
+      if (errorOf(error).code === 'login') { setAccount(null); setModal('user'); }
+    }
+    finally { pendingCommentLike.current.delete(comment.id); }
+  };
   const submitComment = async () => {
     if (!selected || !reply.trim() || sending) return;
     if (!account) { setModal('user'); return; }
     setSending(true);
     try {
       await api('comment', { id: selected.id, text: reply.trim(), reply: replyTarget?.id, root: replyTarget?.rootId, is_cy: selected.isCy });
-      setReply(''); setReplyTarget(null); notify('评论已发送'); await requestDetail(selected.id);
-    } catch (error) { notify(errorOf(error).message); if (errorOf(error).code === 'login') setAccount(null); }
+      setReply(''); setReplyTarget(null); setComposerDocked(false); notify('评论已发送');
+      // A sent comment ends the composer's focus pause so comment pagination resumes.
+      releaseReplyFocus();
+      await requestDetail(selected.id);
+    } catch (error) {
+      notify(errorOf(error).message); if (errorOf(error).code === 'login') setAccount(null);
+      // Disabling the submit button while sending drops focus to <body>, which releases the
+      // pagination pause early; take the focus back so a failed send keeps the draft in view.
+      replyRef.current?.focus();
+    }
     finally { setSending(false); }
   };
   const showPersonProfile = (id: string, name = '', avatarUrl = '', level = 0) => {
@@ -328,6 +415,10 @@ export default function App() {
         if (image) setImage(null); else if (modal) setModal(null); else setProfile(null);
         return;
       }
+      // Esc cancels the floating composer, but only when no overlay owns the key (overlays win above).
+      if (composerDocked && !modal && !image && !profile && event.key === 'Escape') {
+        event.preventDefault(); collapseComposer(); return;
+      }
       const target = event.target as HTMLElement;
       if (!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
         const direction = event.key === 'ArrowLeft' ? -1 : 1;
@@ -345,7 +436,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, image, profile, prefs.shortcuts, keybindings, selected?.id, selected?.images.length, isPhotoPost]);
+  }, [modal, image, profile, prefs.shortcuts, keybindings, selected?.id, selected?.images.length, isPhotoPost, composerDocked]);
 
   const theme = prefs.theme === 'system' ? (systemDark ? 'dark' : 'light') : prefs.theme;
   const toggle = (id: number, items: number[], update: (items: number[]) => void) => update(items.includes(id) ? items.filter(item => item !== id) : [...items, id]);
@@ -354,6 +445,14 @@ export default function App() {
   const openPost = (post: Post) => {
     if (!selected) listScroll.current = { context: listContext, top: contentRef.current?.scrollTop ?? 0 };
     postOriginProfile.current = null; setSelected(post); setReply(''); setHistory([post.id, ...history.filter(id => id !== post.id)].slice(0, 100));
+  };
+  // The comment button next to like replies to the post itself: clear any reply target, open the post
+  // if needed, then reveal + focus the composer once it is rendered (effect-driven, no timers).
+  const focusReplyBox = () => { composerTriggerRef.current = document.activeElement as HTMLElement | null; replyFocusPending.current = true; setReplyFocusTick(tick => tick + 1); };
+  const replyToPost = (post: Post) => {
+    setReplyTarget(null);
+    if (selected?.id !== post.id) openPost(post);
+    focusReplyBox();
   };
   const visiblePosts = useMemo(() => {
     let result = posts.filter(post => {
@@ -426,7 +525,7 @@ export default function App() {
   }) : <span className="topic-tag muted">未分类</span>}</div>;
   const actions = (post: Post) => <div className="post-actions">
     <button disabled={pendingLike === post.id} className={post.liked ? 'is-liked' : ''} aria-label={`${post.liked ? '取消点赞' : '点赞'} ${post.title}`} onClick={() => void likePost(post)}><ThumbsUp size={15} />{post.likes}</button>
-    <button onClick={() => openPost(post)} aria-label={`查看评论 ${post.title}`}><MessageCircle size={16} />{post.comments}</button>
+    <button onClick={() => replyToPost(post)} aria-label={`回复 ${post.title}`}><MessageCircle size={16} />{post.comments}</button>
     <button className={bookmarks.includes(post.id) ? 'is-saved' : ''} aria-label={`${bookmarks.includes(post.id) ? '取消收藏' : '收藏'} ${post.title}`} aria-pressed={bookmarks.includes(post.id)} onClick={() => { toggle(post.id, bookmarks, setBookmarks); notify(bookmarks.includes(post.id) ? '已取消本地收藏' : '已保存到本地收藏'); }}><Bookmark size={15} /></button>
     <button className="post-more" aria-label={`更多操作 ${post.title}`} onClick={openFilter}><MoreHorizontal size={18} /></button>
   </div>;
@@ -459,14 +558,14 @@ export default function App() {
                 <div className="post-body">{selected.body.map((p,index) => <p key={index}><RichText text={p} /></p>)}{!isPhotoPost && selected.images.map((src, index) => <button className="detail-image" key={src} aria-label={`查看正文图片 ${index + 1}`} onClick={() => openImage(selected, index)}><img src={src} alt={`${selected.title} 图片 ${index + 1}`} referrerPolicy="no-referrer" /></button>)}{selected.videoUrl && <video controls preload="none" src={selected.videoUrl} />}</div>
                 {isPhotoPost && topicBadges(selected)}
                 {actions(selected)}<div className="comments-heading" ref={commentsRef}><h3>评论</h3><span>{selected.comments}</span><span className="comment-sort">热门评论</span></div>
-                {comments.map(comment => <CommentThread key={`${selected.id}:${comment.id}`} comment={comment} onReply={c => { setReplyTarget(c); document.getElementById('reply-input')?.focus(); }} onProfile={c => showPersonProfile(c.userId, c.author, c.avatarUrl, c.level)} onLogin={() => setModal('user')} onImage={openCommentImage} />)}
+                {comments.map(comment => <CommentThread key={`${selected.id}:${comment.id}`} comment={comment} onReply={c => { setReplyTarget(c); focusReplyBox(); }} onProfile={c => showPersonProfile(c.userId, c.author, c.avatarUrl, c.level)} onLogin={() => setModal('user')} onImage={openCommentImage} onLike={likeComment} />)}
                 {!detailLoading && !detailError && !comments.length && <p className="loading-state">还没有评论</p>}
                 {detailError && comments.length > 0 && <ErrorNotice error={detailError} retry={() => void requestDetail(selected.id, failedDetailPage.current)} login={() => setModal('user')} />}
                 {moreComments && !detailError && <div className="feed-end comments-end" ref={commentsEndRef} role="status">{detailLoading ? '正在加载更多评论…' : '继续下滑加载更多评论'}</div>}
-                <form className="reply-form" onSubmit={event => { event.preventDefault(); void submitComment(); }}>
-                  {replyTarget && <div className="reply-target">回复 @{replyTarget.author}<button type="button" onClick={() => setReplyTarget(null)}><X size={12} /></button></div>}
+                <form className={`reply-form${composerDocked ? ' is-docked' : ''}`} ref={replyFormRef} onFocusCapture={() => { replyFocusedRef.current = true; setReplyFocused(true); }} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { replyFocusedRef.current = false; setReplyFocused(false); } }} onSubmit={event => { event.preventDefault(); void submitComment(); }}>
+                  {replyTarget && <div className="reply-target">回复 @{replyTarget.author}<button type="button" onClick={() => { setReplyTarget(null); releaseReplyFocus(); }}><X size={12} /></button></div>}
                   <textarea ref={replyRef} onSelect={e => { replySelection.current = {start:e.currentTarget.selectionStart,end:e.currentTarget.selectionEnd}; }} id="reply-input" aria-label="评论内容" placeholder={account ? '说说你的想法…' : '扫码登录后参与讨论'} maxLength={5000} value={reply} onChange={e => setReply(e.target.value)} />
-                  <div className="reply-toolbar"><button type="button" className="emoji-toggle" aria-label="选择表情" aria-expanded={emojiPicker} onClick={() => setEmojiPicker(!emojiPicker)}><Smile size={18} /></button><span>{account ? '评论将发送到小黑盒' : '登录后才能评论'}</span><button className="primary-button" disabled={!reply.trim() || sending || !!detailError || detailLoading} type="submit">{sending ? '发送中…' : '评论'}</button></div>
+                  <div className="reply-toolbar"><button type="button" className="emoji-toggle" aria-label="选择表情" aria-expanded={emojiPicker} onClick={() => setEmojiPicker(!emojiPicker)}><Smile size={18} /></button><span>{account ? '评论将发送到小黑盒' : '登录后才能评论'}</span><button className="primary-button" disabled={!reply.trim() || sending || !!detailError || detailLoading} type="submit">{sending ? '发送中…' : '评论'}</button>{composerDocked && <button type="button" className="composer-collapse" aria-label="收起评论框" title="收起评论框（Esc）" onClick={collapseComposer}><ChevronDown size={16} /></button>}</div>
                   {emojiPicker && <EmojiPicker onSelect={token => { const {start,end} = replySelection.current; const from = Math.min(start,reply.length), to = Math.min(end,reply.length); const next=reply.slice(0,from)+token+reply.slice(to); if (next.length > 5000) { notify('评论最多输入 5000 个字符'); return; } setReply(next); const caret=from+token.length; replySelection.current={start:caret,end:caret}; requestAnimationFrame(()=>{ replyRef.current?.focus(); replyRef.current?.setSelectionRange(caret,caret); }); }} />}
                 </form>
               </div> : <>

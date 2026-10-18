@@ -90,6 +90,10 @@ pub enum Command {
         id: u64,
         liked: bool,
     },
+    LikeComment {
+        id: u64,
+        liked: bool,
+    },
     Comment {
         id: u64,
         text: String,
@@ -601,6 +605,26 @@ impl Backend {
                     post["liked"] = json!(liked);
                     self.storage.cache(&format!("post:{id}"), &post)?;
                 }
+                Ok(json!({"liked":liked}))
+            }
+            Command::LikeComment { id, liked } => {
+                self.require_login().await?;
+                if id == 0 {
+                    return Err(AppError::invalid());
+                }
+                self.request(
+                    "/bbs/app/comment/support",
+                    vec![],
+                    Some(vec![
+                        ("comment_id".into(), id.to_string()),
+                        (
+                            "support_type".into(),
+                            comment_support_type(liked).into(),
+                        ),
+                    ]),
+                    None,
+                )
+                .await?;
                 Ok(json!({"liked":liked}))
             }
             Command::Comment {
@@ -1127,6 +1151,26 @@ fn merge_account_profile(current: &Value, profile: &Value) -> Value {
     }
     account
 }
+// Verified against the web client: support_type is an explicit action, not a toggle.
+// 1 = like, 2 = cancel; the caller decides from the comment's current is_support.
+fn comment_support_type(liked: bool) -> &'static str {
+    if liked {
+        "1"
+    } else {
+        "2"
+    }
+}
+// Keep upstream reasons such as moderation rejections visible to the user instead of
+// hiding every failure behind one generic sentence. Truncate by characters, not bytes.
+fn upstream_reason(value: &Value) -> String {
+    const FALLBACK: &str = "小黑盒暂未接受此次请求，请稍后重试";
+    let msg = model::text(&value["msg"]);
+    let msg = msg.trim();
+    if msg.is_empty() {
+        return FALLBACK.into();
+    }
+    msg.chars().take(200).collect()
+}
 fn check_status(value: &Value) -> Result<()> {
     match value["status"].as_str().unwrap_or("") {
         "ok" => Ok(()),
@@ -1140,10 +1184,7 @@ fn check_status(value: &Value) -> Result<()> {
             "lack_token",
             "小黑盒要求重新验证登录，请重新扫码或前往官方社区",
         )),
-        _ => Err(AppError::new(
-            "upstream",
-            "小黑盒暂未接受此次请求，请稍后重试",
-        )),
+        _ => Err(AppError::new("upstream", upstream_reason(value))),
     }
 }
 
@@ -1329,5 +1370,72 @@ mod tests {
         }
         preferences["showSidebar"] = json!("false");
         assert!(validate_state("heybox.preferences", &preferences).is_err());
+    }
+    #[test]
+    fn like_comment_maps_liked_to_explicit_support_types() {
+        assert_eq!(comment_support_type(true), "1");
+        assert_eq!(comment_support_type(false), "2");
+        let command: Command = serde_json::from_value(
+            json!({"type":"likeComment","payload":{"id":977357367,"liked":true}}),
+        )
+        .unwrap();
+        match command {
+            Command::LikeComment { id, liked } => {
+                assert_eq!(id, 977357367);
+                assert!(liked);
+            }
+            _ => panic!("expected likeComment"),
+        }
+        assert!(serde_json::from_value::<Command>(
+            json!({"type":"likeComment","payload":{"id":977357367,"liked":false}})
+        )
+        .is_ok());
+        // Both fields are required; unknown payload keys stay rejected.
+        assert!(serde_json::from_value::<Command>(
+            json!({"type":"likeComment","payload":{"id":977357367}})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<Command>(
+            json!({"type":"likeComment","payload":{"liked":true}})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<Command>(
+            json!({"type":"likeComment","payload":{"id":1,"liked":true,"extra":1}})
+        )
+        .is_err());
+    }
+    #[test]
+    fn upstream_failures_surface_and_truncate_the_reported_reason() {
+        let error = check_status(&json!({"status":"reject","msg":"  评论已被删除  "})).unwrap_err();
+        assert_eq!(error.code, "upstream");
+        assert_eq!(error.message, "评论已被删除");
+        let long = "长".repeat(300);
+        let error = check_status(&json!({"status":"reject","msg":long})).unwrap_err();
+        assert_eq!(error.message.chars().count(), 200);
+        assert!(long.starts_with(&error.message));
+        for value in [
+            json!({"status":"reject"}),
+            json!({"status":""}),
+            json!({"status":"reject","msg":"   "}),
+            json!({"status":"reject","msg":Value::Null}),
+        ] {
+            let error = check_status(&value).unwrap_err();
+            assert_eq!(error.code, "upstream", "{value}");
+            assert_eq!(error.message, "小黑盒暂未接受此次请求，请稍后重试", "{value}");
+        }
+        // The dedicated branches keep their codes and wording.
+        assert_eq!(
+            check_status(&json!({"status":"login"})).unwrap_err().message,
+            "登录已失效，请重新扫码登录"
+        );
+        assert_eq!(
+            check_status(&json!({"status":"lack_token"}))
+                .unwrap_err()
+                .code,
+            "lack_token"
+        );
+        let captcha = check_status(&json!({"status":"show_captcha"})).unwrap_err();
+        assert_eq!(captcha.code, "show_captcha");
+        assert!(captcha.official_url.is_some());
     }
 }

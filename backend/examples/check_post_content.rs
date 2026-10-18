@@ -46,6 +46,7 @@ async fn main() {
             Ok(detail) => {
                 let comments = detail["comments"].as_array().cloned().unwrap_or_default();
                 let mut sub_ip = (0usize, 0usize);
+                let mut sub_like = (0usize, 0usize);
                 println!(
                     "comment_metadata_check={}",
                     json!({"withLevel":comments.iter().filter(|c|c["level"].as_u64().unwrap_or(0)>0).count(),"pinned":comments.iter().filter(|c|c["pinned"]==true).count(),"previews":comments.iter().filter_map(|c|c["replies"].as_array()).map(Vec::len).sum::<usize>()})
@@ -73,6 +74,11 @@ async fn main() {
                                     .filter(|c| !c["ipLocation"].as_str().unwrap_or_default().is_empty())
                                     .count();
                                 sub_ip.1 += list.len();
+                                sub_like.0 += list
+                                    .iter()
+                                    .filter(|c| c["supported"].as_bool().unwrap_or(false))
+                                    .count();
+                                sub_like.1 += list.len();
                                 let next = sub["lastval"].as_str().unwrap_or_default().to_string();
                                 println!(
                                     "reply_check={}",
@@ -95,6 +101,11 @@ async fn main() {
                         .filter(|c| !c["ipLocation"].as_str().unwrap_or_default().is_empty())
                         .count()
                 };
+                let count_supported = |list: &[Value]| {
+                    list.iter()
+                        .filter(|c| c["supported"].as_bool().unwrap_or(false))
+                        .count()
+                };
                 let previews = comments
                     .iter()
                     .filter_map(|c| c["replies"].as_array())
@@ -104,6 +115,10 @@ async fn main() {
                 println!(
                     "ip_check={}",
                     json!({"postIp":detail["post"]["ipLocation"],"postHasIp":!detail["post"]["ipLocation"].as_str().unwrap_or_default().is_empty(),"commentsWithIp":count_ip(&comments),"comments":comments.len(),"previewsWithIp":count_ip(&previews),"previews":previews.len(),"subCommentsWithIp":sub_ip.0,"subComments":sub_ip.1})
+                );
+                println!(
+                    "like_state_check={}",
+                    json!({"comments":comments.len(),"supported":count_supported(&comments),"previews":previews.len(),"previewsSupported":count_supported(&previews),"subComments":sub_like.1,"subCommentsSupported":sub_like.0})
                 );
                 println!(
                     "detail_check={}",

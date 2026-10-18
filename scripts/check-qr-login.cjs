@@ -16,6 +16,7 @@ async (page) => {
       case 'stateGet': data = states[request.payload.key] ?? null; break;
       case 'stateSet': states[request.payload.key] = request.payload.value; data = true; break;
       case 'communities': data = []; break;
+      case 'emojis': data = { version: 'synthetic', emojis: [] }; break;
       case 'feed': data = { posts: [], hasMore: false, cursor: { offset: 0, topics: {}, exhausted: [], rotation: 0 } }; break;
       case 'qrStart': data = { session: 'synthetic-qr', expiresAt: Math.floor(Date.now() / 1000) + 120, svg: '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="white"/></svg>' }; break;
       case 'qrPoll':

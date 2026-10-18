@@ -15,6 +15,7 @@ async page => {
       case 'stateSet':states[r.payload.key]=r.payload.value;data=true;break;
       case 'communities':data=[];break;
       case 'feed':data={posts:[{...post,userId:''}],cursor:{offset:30,topics:{},exhausted:[],rotation:0},hasMore:false};break;
+      case 'emojis':data={version:'synthetic',emojis:[]};break;
       case 'detail':data={post:r.payload.id===2?first:post,comments:[comment],page:1,hasMore:false,isCy:false};break;
       case 'profile':data={id:r.payload.id,name:r.payload.id==='12345'?'测试盒友':r.payload.id==='67890'?'评论盒友':'子评论盒友',avatarUrl:'',level:14,bio:'主页个人简介'};break;
       case 'userPosts':

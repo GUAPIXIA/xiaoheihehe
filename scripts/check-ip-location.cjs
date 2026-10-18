@@ -182,6 +182,9 @@ async (page) => {
   const rawSubDots = await rawBlankSub.locator('small .meta-dot').count();
   const rawSubText = await rawBlankSub.locator('small').innerText();
   if (rawSubSpans !== 0 || rawSubDots !== 0) throw new Error(`SUB reply render guard not trimmed: spans=${rawSubSpans} dots=${rawSubDots} line=${JSON.stringify(rawSubText)} (CommentThread.tsx:75 still uses c.ipLocation &&)`);
+  // Sub replies no longer render a like count (.sub-comment-likes was removed), so the meta
+  // line is exactly time + reply. Confirmed by running this script before editing it.
+  if (rawSubText !== '刚刚回复') throw new Error(`Sub reply meta line should be exactly 刚刚回复 (no sub-comment likes), got ${JSON.stringify(rawSubText)}`);
 
   const diagnostics = {
     rawWhitespaceValue: ' ',

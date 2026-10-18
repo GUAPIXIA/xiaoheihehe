@@ -57,7 +57,7 @@ export function UserHome({ initial, onOpenPost, onLogin }: { initial: Account; o
     <h3 className="user-home-heading">发布内容</h3>
     <div className="post-list">{posts.map(post => <article className="post-card user-home-post" key={post.id} onClick={event => { if (!(event.target as Element).closest('button, a')) open(post); }}>
       <button className="post-content" onClick={() => open(post)}><h2><RichText text={post.title || '查看帖子'} /></h2><p><RichText text={post.excerpt} /></p></button>
-      {post.images.length > 0 && <button className="user-home-images" aria-label={`打开 ${post.title} 的帖子`} onClick={() => open(post)}>{post.images.slice(0,3).map(src => <img key={src} src={src} alt="帖子配图" loading="lazy" referrerPolicy="no-referrer" />)}</button>}
+      {post.images.length > 0 && <button className={`user-home-images${post.images.length === 1 ? ' single-image' : ''}`} aria-label={`打开 ${post.title} 的帖子`} onClick={() => open(post)}>{post.images.slice(0,3).map(src => <img key={src} src={src} alt="帖子配图" loading="lazy" referrerPolicy="no-referrer" />)}</button>}
       <div className="user-home-post-meta"><span>{postTime(post)}{post.kind && ` · ${post.kind}`}</span><span><ThumbsUp size={13} />{post.likes}<MessageCircle size={13} />{post.comments}</span></div>
     </article>)}</div>
     {loading && <p className="loading-state" role="status">正在读取发布内容…</p>}

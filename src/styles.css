@@ -161,10 +161,11 @@ svg { flex-shrink: 0; }
 .all-communities { display: flex; align-items: center; justify-content: center; width: 100%; padding: 12px 0; font-size: 11px; gap: 5px; color: var(--secondary); margin-top: 4px; border-top: 1px solid var(--line); }
 .sidebar-footer { display: flex; gap: 12px; color: var(--muted); font-size: 9px; padding: 17px 2px; }
 .sidebar-footer button { padding: 0; }
-.zoom-control { position: absolute; right: 14px; bottom: 10px; z-index: 5; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 4px; font-size: 10px; color: var(--secondary); background: var(--bg); }
+.zoom-control { position: absolute; right: 14px; bottom: calc(10px + var(--reply-dock-lift, 0px)); z-index: 5; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 4px; font-size: 10px; color: var(--secondary); background: var(--bg); }
 .zoom-control:hover { color: var(--text); background: var(--hover); }
 .refresh-control { position: absolute; right: 18px; bottom: 46px; z-index: 5; }
-.detail-navigation { position: absolute; right: 18px; bottom: 46px; z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+.detail-navigation { position: absolute; right: 18px; bottom: calc(46px + var(--reply-dock-lift, 0px)); z-index: 5; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.detail-navigation > button { pointer-events: auto; }
 .refresh-control, .detail-navigation > button { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 50%; color: var(--secondary); background: var(--bg); box-shadow: 0 3px 12px #00000012; }
 .refresh-control:hover:not(:disabled), .detail-navigation > button:hover { color: var(--text); background: var(--hover); }
 .is-spinning { animation: spin .9s linear infinite; }
@@ -251,7 +252,7 @@ input[type='checkbox'], input[type='radio'] { accent-color: #526074; }
 .user-panel h3 { font-size: 15px; margin: 18px 0 8px; }.user-panel p { font-size: 12px; color: var(--secondary); }
 .login-placeholder { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 25px 0 15px; background: var(--soft); padding: 18px 10px; color: var(--secondary); font-size: 12px; border-radius: 5px; }
 .user-panel .secondary-button { font-size: 11px; }
-.toast { position: absolute; z-index: 30; bottom: 45px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); box-shadow: 0 4px 16px #0002; border-radius: 5px; padding: 11px 16px; display: flex; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; animation: appear .13s ease-out; }
+.toast { position: absolute; z-index: 30; bottom: 45px; left: 50%; transform: translateX(-50%); pointer-events: none; background: var(--text); color: var(--bg); box-shadow: 0 4px 16px #0002; border-radius: 5px; padding: 11px 16px; display: flex; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; animation: appear .13s ease-out; }
 .image-gallery { position: relative; width: 100%; aspect-ratio: 1; max-height: min(520px, 65vh); background: var(--soft); border-radius: 6px; overflow: hidden; isolation: isolate; }
 .gallery-image { width: 100%; height: 100%; padding: 0; display: flex; align-items: center; justify-content: center; }
 button.gallery-image { cursor: zoom-in; }
@@ -303,8 +304,15 @@ button.gallery-image { cursor: zoom-in; }
 .post-body { font-size: 14px; line-height: 2; }.post-body p { margin: 20px 0; }.detail-image { padding: 0; width: 100%; display: block; margin: 14px 0; }.detail-image img { width: 100%; border-radius: 5px; display: block; }
 .post-detail > .post-actions { padding: 20px 0; border-bottom: 1px solid var(--line); }
 .comments-heading { display: flex; align-items: center; gap: 7px; margin: 25px 0 18px; font-size: 12px; color: var(--muted); }.comments-heading h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }.comment-sort { margin-left: auto; font-size: 11px; }
-.comment { display: flex; align-items: flex-start; gap: 10px; padding: 15px 0; border-bottom: 1px solid var(--line); }.small-avatar { width: 27px; height: 27px; font-size: 11px; background: #9ba5ae; }.comment > div { flex: 1; }.comment strong { font-size: 11px; font-weight: 550; }.comment p { font-size: 12px; line-height: 1.8; margin: 7px 0; }.comment small { font-size: 10px; color: var(--muted); }.comment small button { margin-left: 14px; font-size: 10px; }.comment-likes { display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 10px; margin-top: 3px; }
+/* Right gap keeps comment like buttons clear of the floating chrome (zoom pill, nav circles). */
+.comment { display: flex; align-items: flex-start; gap: 10px; padding: 15px 20px 15px 0; border-bottom: 1px solid var(--line); }.small-avatar { width: 27px; height: 27px; font-size: 11px; background: #9ba5ae; }.comment > div { flex: 1; }.comment strong { font-size: 11px; font-weight: 550; }.comment p { font-size: 12px; line-height: 1.8; margin: 7px 0; }.comment small { font-size: 10px; color: var(--muted); }.comment small button { margin-left: 14px; font-size: 10px; }
 .reply-form { background: var(--soft); border: 1px solid var(--line); padding: 13px; margin-top: 24px; border-radius: 5px; }.reply-form textarea { width: 100%; min-height: 70px; resize: vertical; background: transparent; border: 0; font-size: 12px; color: var(--text); line-height: 1.8; }.reply-form > div { display: flex; justify-content: space-between; align-items: center; }.reply-form span { font-size: 10px; color: var(--muted); }
+/* Floating composer: sticky at the bottom of the comment list while the user replies. */
+.reply-form.is-docked { position: sticky; bottom: 0; z-index: 6; background: var(--bg); border: 1px solid var(--line); border-bottom: 0; padding: 13px 20px; margin: 24px -20px 0; border-radius: 6px 6px 0 0; box-shadow: 0 -8px 18px #0000000f; }
+.reply-form.is-docked textarea { min-height: 44px; max-height: 30vh; }
+.reply-form.is-docked .emoji-picker { max-height: 34vh; overflow: auto; }
+.composer-collapse { display: inline-flex; align-items: center; justify-content: center; padding: 5px; border-radius: 4px; color: var(--secondary); flex-shrink: 0; }
+.composer-collapse:hover { color: var(--text); background: var(--hover); }
 .comment { position: relative; }
 .comment-content { min-width: 0; }
 .comment p { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -336,8 +344,12 @@ button.gallery-image { cursor: zoom-in; }
 .user-home-profile > div { min-width: 0; }
 .user-home-heading { font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .user-home-post { padding: 15px 0; border-bottom: 1px solid var(--line); }
-.user-home-images { display: flex; gap: 6px; padding: 0; margin: 12px 0; max-width: 100%; }
-.user-home-images img { width: 100px; max-width: 30%; height: 74px; border-radius: 4px; object-fit: cover; }
+/* A <button> shrinks to fit, so a percentage max-width collapsed every image to 30px.
+   Use the feed's grid so profile thumbnails fill the card width instead. */
+.user-home-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; padding: 0; margin: 12px 0; width: 100%; }
+.user-home-images img { width: 100%; height: 106px; border-radius: 5px; object-fit: cover; display: block; background: var(--soft); }
+.user-home-images.single-image { grid-template-columns: minmax(0, 255px); }
+.user-home-images.single-image img { height: 120px; }
 .user-home-post-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: var(--muted); margin-top: 10px; }
 .user-home-post-meta > span:last-child { display: inline-flex; align-items: center; gap: 6px; }
 .comment-author-tag { background: var(--text); color: var(--bg); padding: 1px 4px; border-radius: 2px; font-size: 9px; }
@@ -348,7 +360,10 @@ button.gallery-image { cursor: zoom-in; }
 .sub-comment + .sub-comment { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .sub-comment p { margin: 5px 0; }
 .reply-to { font-size: 11px; color: var(--secondary); }
-.sub-comment-likes { display: inline-flex; align-items: center; gap: 4px; margin-left: 14px; }
+.comment-like { display: flex; gap: 4px; align-items: center; padding: 0; color: var(--muted); font-size: 10px; margin-top: 3px; }
+.comment-like:hover { color: var(--text); }
+.comment-like.is-supported { color: #52769d; }
+.comment-like.is-supported svg { fill: #52769d20; }
 .reply-navigation { display: flex; justify-content: center; gap: 14px; }
 .reply-navigation > button { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--secondary); font-size: 11px; }
 .preview-rest { text-align: center; }.preview-rest .brand-mark { height: 50px; width: 50px; font-size: 28px; }.preview-rest h2 { font-size: 20px; font-weight: 550; margin-top: 24px; }.preview-rest p { font-size: 13px; color: var(--secondary); margin-bottom: 25px; }

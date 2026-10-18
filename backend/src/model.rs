@@ -399,6 +399,8 @@ pub struct Comment {
     #[serde(default)]
     pub images: Vec<String>,
     pub likes: u64,
+    #[serde(default)]
+    pub supported: bool,
     pub time: String,
     pub root_id: u64,
     #[serde(default)]
@@ -451,6 +453,8 @@ fn comment(v: &Value, root: Option<u64>) -> Option<Comment> {
         text: plain_text(&first(v, &["text", "content"])),
         images: comment_images(v),
         likes: number(&v["up"]).max(number(&v["support_num"])),
+        // The web client treats exactly is_support === 1 as "liked by me"; 2 means cancelled.
+        supported: number(&v["is_support"]) == 1,
         time: first(v, &["formated_time", "formatted_time"]),
         root_id: root.unwrap_or_else(|| match number(&v["root_id"]) {
             0 => id,
@@ -755,5 +759,23 @@ mod tests {
         assert!(legacy_post.ip_location.is_empty());
         let legacy_comment: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
         assert!(legacy_comment.ip_location.is_empty());
+    }
+    #[test]
+    fn comment_support_flag_maps_is_support_and_stays_backward_compatible() {
+        let list = serde_json::to_value(comments(&serde_json::json!({"comments":[
+            {"commentid":1,"user":{"username":"a"},"text":"已赞","is_support":1},
+            {"commentid":2,"user":{"username":"b"},"text":"已取消","is_support":2},
+            {"commentid":3,"user":{"username":"c"},"text":"缺字段"},
+            {"commentid":4,"user":{"username":"d"},"text":"零值","is_support":0},
+            {"commentid":5,"user":{"username":"e"},"text":"字符串一","is_support":"1"}
+        ]}))).unwrap();
+        assert_eq!(list[0]["supported"], true);
+        assert_eq!(list[1]["supported"], false);
+        assert_eq!(list[2]["supported"], false);
+        assert_eq!(list[3]["supported"], false);
+        assert_eq!(list[4]["supported"], true);
+        // Comments cached before the field existed still deserialize.
+        let legacy: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
+        assert!(!legacy.supported);
     }
 }

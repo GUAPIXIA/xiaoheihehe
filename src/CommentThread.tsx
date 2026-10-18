@@ -32,7 +32,7 @@ function CommentImages({ comment, onImage }: { comment: Comment; onImage: (c: Co
     {images.map((src, index) => <CommentImage key={src} src={src} alt={`${comment.author} 的评论图片 ${index + 1}`} label={`查看 ${comment.author} 的评论图片 ${index + 1}`} onOpen={() => onImage(comment, index)} />)}
   </div>;
 }
-export function CommentThread({ comment, onReply, onProfile, onLogin, onImage }: { comment: Comment; onReply: (c: Comment) => void; onProfile: (c: Comment) => void; onLogin: () => void; onImage: (c: Comment, index: number) => void }) {
+export function CommentThread({ comment, onReply, onProfile, onLogin, onImage, onLike }: { comment: Comment; onReply: (c: Comment) => void; onProfile: (c: Comment) => void; onLogin: () => void; onImage: (c: Comment, index: number) => void; onLike: (c: Comment) => void }) {
   const [replies, setReplies] = useState(comment.replies ?? []);
   const [expanded, setExpanded] = useState(false);
   const [hasMore, setHasMore] = useState(!!comment.hasMoreReplies);
@@ -45,7 +45,8 @@ export function CommentThread({ comment, onReply, onProfile, onLogin, onImage }:
     setReplies(preview); setExpanded(false); setHasMore(!!comment.hasMoreReplies); setError(null); setLoading(false);
     cursor.current = preview.length ? String(preview[preview.length - 1].id) : '';
     return () => { request.current?.abort(); request.current = null; };
-  }, [comment]);
+    // Only reply payload changes reset the thread; a like updates other fields and must keep replies expanded.
+  }, [comment.id, comment.replies, comment.hasMoreReplies]);
   const loadReplies = async () => {
     if (request.current) return;
     setExpanded(true);
@@ -72,7 +73,7 @@ export function CommentThread({ comment, onReply, onProfile, onLogin, onImage }:
       {(replies.length > 0 || comment.replyCount > 0 || hasMore) && <div className="comment-replies">
         {(expanded ? replies : replies.slice(0, 2)).map(c => <div className="sub-comment" key={c.id}>
           {author(c)}{c.replyTo && <span className="reply-to"> 回复 {c.replyTo}</span>}<p><RichText text={c.text} /></p><CommentImages comment={c} onImage={onImage} />
-          <small>{postTime(c)}{c.ipLocation?.trim() && <><span className="meta-dot">·</span><span className="ip-location">{c.ipLocation}</span></>}<button onClick={() => onReply(c)}>回复</button><span className="sub-comment-likes"><ThumbsUp size={11} />{c.likes}</span></small>
+          <small>{postTime(c)}{c.ipLocation?.trim() && <><span className="meta-dot">·</span><span className="ip-location">{c.ipLocation}</span></>}<button onClick={() => onReply(c)}>回复</button></small>
         </div>)}
         {error && <ErrorNotice error={error} retry={() => void loadReplies()} login={onLogin} />}
         <div className="reply-navigation">
@@ -81,6 +82,6 @@ export function CommentThread({ comment, onReply, onProfile, onLogin, onImage }:
           {expanded && <button onClick={() => setExpanded(false)} aria-expanded={true}>收起回复<ChevronUp size={13} /></button>}
         </div>
       </div>}
-    </div><span className="comment-likes"><ThumbsUp size={12} />{comment.likes}</span>
+    </div><button type="button" className={`comment-like${comment.supported ? ' is-supported' : ''}`} aria-pressed={!!comment.supported} aria-label={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} title={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} onClick={() => onLike(comment)}><ThumbsUp size={12} />{comment.likes}</button>
   </div>;
 }

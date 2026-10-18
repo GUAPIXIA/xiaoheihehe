@@ -77,7 +77,7 @@ npm run desktop:build
 
 Windows 构建脚本自动寻找 MSVC 和 SDK，避免误用 Git 的同名链接工具。安装包生成于 `target/release/bundle/nsis/`。程序依赖系统 WebView2；缺少时由安装器下载运行时。
 
-发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.4_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
+发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.5_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
 
 安装器同时部署独立的 `shortcut-icon-rounded.ico`，桌面和开始菜单快捷方式使用该文件。安装或升级时保留快捷方式原有属性并通知 Windows 刷新图标；交互安装结束时再次处理，以覆盖完成页新建的桌面快捷方式。
 
@@ -101,7 +101,7 @@ Windows 构建脚本自动寻找 MSVC 和 SDK，避免误用 Git 的同名链接
 - 列表作者、帖子详情作者、主评论和子评论均可进入盒友主页。
 - 扫码、轮询、过期刷新、取消扫码、退出本地登录。
 - 登录账号自动补全头像并保存，右上角用户按钮和账号面板显示头像。
-- 帖子详情、评论分页及回复、点赞，依赖上游登录和风控许可。
+- 帖子详情、评论分页及回复、点赞，依赖上游登录和风控许可。评论可点赞（再点一次取消，失败自动回滚）；子评论不显示点赞；点「回复」后回复框保持可见（回复期间暂停自动翻页）；上游拒绝时显示其给出的原因。
 - 官方 CUBE 与黑盒娘表情显示，覆盖摘要、正文、评论及子回复；评论输入框支持选择表情并在光标处插入。
 - 点击帖子卡片空白区域也可进入详情；图片预览、作者资料、社区分区及互动按钮保持各自操作。
 - 本地收藏、浏览记录、主题、窗口缩放和托盘退出设置。
