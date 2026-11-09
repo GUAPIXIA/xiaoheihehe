@@ -77,7 +77,7 @@ npm run desktop:build
 
 Windows 构建脚本自动寻找 MSVC 和 SDK，避免误用 Git 的同名链接工具。安装包生成于 `target/release/bundle/nsis/`。程序依赖系统 WebView2；缺少时由安装器下载运行时。
 
-发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.5_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
+发布程序为 `target/release/小黑盒盒.exe`，安装包为 `target/release/bundle/nsis/小黑盒盒_0.1.6_x64-setup.exe`。用户修改后的图标位于 `public/branding/heybox-icon.png`，用于网页、关于页、Windows 程序和托盘；修改它后需要重新生成 `src-tauri/icons/` 中的 Windows 图标再打包。
 
 安装器同时部署独立的 `shortcut-icon-rounded.ico`，桌面和开始菜单快捷方式使用该文件。安装或升级时保留快捷方式原有属性并通知 Windows 刷新图标；交互安装结束时再次处理，以覆盖完成页新建的桌面快捷方式。
 

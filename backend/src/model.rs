@@ -259,6 +259,16 @@ pub fn post(v: &Value) -> Option<Post> {
     let mut seen = std::collections::HashSet::new();
     images.retain(|url| seen.insert(url.clone()));
     let time = first(v, &["formated_time", "formatted_time", "time"]);
+    // Upstream bumps modify_at on every new comment/reply, so it is the latest
+    // activity time rather than the publish time: a post published days ago but
+    // commented on right now would otherwise be shown as "just now". Prefer
+    // create_at and only fall back to modify_at for entries without one.
+    let create_at = number(&v["create_at"]);
+    let created_at = if create_at == 0 {
+        number(&v["modify_at"])
+    } else {
+        create_at
+    };
     Some(Post {
         id,
         user_id: {
@@ -287,7 +297,7 @@ pub fn post(v: &Value) -> Option<Post> {
         medal_name: text(&medal["name"]),
         liked: yes(&v["is_award_link"]),
         followed: yes(&user["is_follow"]),
-        created_at: number(&v["create_at"]).max(number(&v["modify_at"])),
+        created_at,
         kind: match number(&v["link_tag"]) {
             1 => "视频",
             11 => "文章",
@@ -777,5 +787,34 @@ mod tests {
         // Comments cached before the field existed still deserialize.
         let legacy: Comment = serde_json::from_value(serde_json::json!({"id":1,"author":"a","avatar":"a","avatarUrl":"","text":"t","likes":0,"time":"","rootId":1})).unwrap();
         assert!(!legacy.supported);
+    }
+    #[test]
+    fn post_created_at_uses_publish_time_not_latest_comment() {
+        // create_at (publish, 2026-11-09 11:58:30) must win even though upstream
+        // moves modify_at forward with every comment (17:52:06 here).
+        let published = serde_json::to_value(post(&serde_json::json!({
+            "linkid":196484134,"user":{"username":"盒友"},"title":"发布时间",
+            "create_at":1794196710,"modify_at":1794217926
+        })))
+        .unwrap();
+        assert_eq!(published["createdAt"], serde_json::json!(1794196710));
+        // Entries without create_at (topic/news style payloads) keep the only timestamp.
+        let fallback = serde_json::to_value(post(&serde_json::json!({
+            "linkid":2,"user":{"username":"盒友"},"title":"头条","modify_at":1791621763
+        })))
+        .unwrap();
+        assert_eq!(fallback["createdAt"], serde_json::json!(1791621763));
+        // String timestamps are accepted like the other numeric fields.
+        let stringy = serde_json::to_value(post(&serde_json::json!({
+            "linkid":3,"user":{"username":"盒友"},"title":"字符串","create_at":"1794196710"
+        })))
+        .unwrap();
+        assert_eq!(stringy["createdAt"], serde_json::json!(1794196710));
+        // No timestamp at all stays 0 so the client renders no time.
+        let missing = serde_json::to_value(post(&serde_json::json!({
+            "linkid":4,"user":{"username":"盒友"},"title":"无时间"
+        })))
+        .unwrap();
+        assert_eq!(missing["createdAt"], serde_json::json!(0));
     }
 }
