@@ -401,3 +401,136 @@ button.gallery-image { cursor: zoom-in; }
 .comment-image:focus-visible { outline-offset: 2px; }
 .comment-image.is-error img { visibility: hidden; }
 .comment-image-error { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--muted); font-size: 10px; }
+
+/* ------------------------------------------------------------------ */
+/* Motion system                                                       */
+/* Tokens live on :root so ::view-transition-* pseudo elements inherit  */
+/* them (they are generated under the root element, not inside .desktop-stage). */
+/* ------------------------------------------------------------------ */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --motion-press: 80ms;
+  --motion-ease-out: cubic-bezier(.2, .7, .2, 1);
+  --motion-ease-in-out: cubic-bezier(.4, 0, .2, 1);
+  --motion-ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* Pointer feedback: colour changes ease instead of snapping. */
+.icon-button, .window-control, .page-menu, .page-dropdown button, .post-actions button,
+.topic-tag, .primary-button, .secondary-button, .text-button, .settings-nav button,
+.gallery-arrow, .back-button, .community-ribbon button, .community-list > button,
+.all-communities, .theme-options button, .scale-presets button, .emoji-groups button,
+.emoji-grid button, .comment-like, .refresh-control, .detail-navigation > button,
+.zoom-control, .titlebar-search button, .home-community-manage {
+  transition: color var(--motion-fast) var(--motion-ease-out),
+              background-color var(--motion-fast) var(--motion-ease-out),
+              border-color var(--motion-fast) var(--motion-ease-out),
+              opacity var(--motion-fast) var(--motion-ease-out),
+              transform var(--motion-press) var(--motion-ease-out);
+}
+.post-content h2, .post-author .author-name, .comment-profile-link {
+  transition: color var(--motion-fast) var(--motion-ease-out);
+}
+@media (hover: hover) {
+  .primary-button:active, .secondary-button:active, .icon-button:active, .window-control:active,
+  .comment-like:active, .post-actions button:active, .emoji-toggle:active, .composer-collapse:active {
+    transform: scale(.97);
+  }
+}
+
+/* Overlay exits. Entry animations stay as they are; closing classes are added by usePresence. */
+.modal-backdrop.is-closing { animation: backdrop-out 120ms var(--motion-ease-in-out) forwards; pointer-events: none; }
+.modal.is-closing { animation: popup-out 140ms var(--motion-ease-out) forwards; }
+.modal.image-modal { animation: image-panel-in 160ms var(--motion-ease-out); }
+.modal.image-modal.is-closing { animation: popup-out 140ms var(--motion-ease-out) forwards; }
+/* A View Transition already animates the panel and picture; CSS entry would race the snapshot. */
+.modal-backdrop.is-morphing { animation: none; }
+.modal.image-modal.is-morphing { animation: none; }
+.page-dropdown { animation: dropdown-in 120ms var(--motion-ease-out); }
+.page-dropdown.is-closing { animation: dropdown-out 100ms var(--motion-ease-out) forwards; pointer-events: none; }
+.menu-dismiss.is-closing { pointer-events: none; }
+.toast { animation: toast-in 140ms var(--motion-ease-out); }
+.toast.is-closing { animation: toast-out 160ms var(--motion-ease-out) forwards; }
+.emoji-picker { animation: picker-in 120ms var(--motion-ease-out); }
+
+/* Loading skeletons: shapes stay close to the real card/comment layout. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.skeleton { position: relative; overflow: hidden; background: var(--soft); border-radius: 4px; }
+.skeleton::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--hover), transparent);
+  animation: shimmer 1.2s linear infinite;
+}
+.skeleton-feed { border-radius: 6px; overflow: hidden; }
+.skeleton-card { padding: 15px 20px 18px; background: var(--bg); border-bottom: 5px solid var(--canvas); }
+.skeleton-user { display: flex; align-items: center; gap: 9px; }
+.skeleton-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+.skeleton-author { width: 120px; height: 12px; display: block; }
+.skeleton-title { width: 82%; height: 17px; margin-top: 16px; }
+.skeleton-text { height: 11px; margin-top: 10px; }
+.skeleton-text.short { width: 62%; }
+.skeleton-cover { height: 120px; margin-top: 12px; border-radius: 5px; }
+.skeleton-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.skeleton-meta { width: 100px; height: 10px; display: block; }
+.skeleton-actions { width: 140px; height: 10px; }
+.skeleton-comment { display: flex; gap: 10px; padding: 15px 20px 15px 0; border-bottom: 1px solid var(--line); }
+.comment-avatar-skeleton { width: 27px; height: 27px; border-radius: 50%; flex-shrink: 0; }
+.skeleton-comment-body { flex: 1; display: grid; gap: 9px; align-content: start; }
+
+/* Images fade in once decoded; avatars and badges intentionally stay instant. */
+.fade-img { opacity: 0; }
+.fade-img.is-loaded { opacity: 1; transition: opacity 150ms var(--motion-ease-out); }
+
+/* Micro feedback for direct actions. */
+.post-actions svg.is-popping, .comment-like svg.is-popping { animation: like-pop 160ms var(--motion-ease-pop); }
+.count { display: inline-block; animation: count-swap 120ms var(--motion-ease-out); }
+
+/* Navigation and image viewer transitions. The root only fades; the moving pieces are
+   the two named shared elements. */
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration: var(--motion-base);
+  animation-timing-function: var(--motion-ease-out);
+}
+::view-transition-group(root) {
+  animation-duration: var(--motion-base);
+  animation-timing-function: var(--motion-ease-out);
+}
+::view-transition-group(vt-post-hero), ::view-transition-group(vt-image) {
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--motion-ease-out);
+}
+
+/* Fallback when View Transitions are unavailable: the detail fades in once. */
+.desktop-stage:not(.has-view-transition) .post-detail { animation: detail-enter var(--motion-base) var(--motion-ease-out); }
+
+@keyframes detail-enter { from { opacity: 0; transform: translateY(6px); } }
+@keyframes backdrop-out { to { opacity: 0; } }
+@keyframes popup-out { to { opacity: 0; transform: translateY(4px) scale(.99); } }
+@keyframes image-panel-in { from { opacity: 0; } }
+@keyframes dropdown-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes dropdown-out { to { opacity: 0; transform: translateY(-3px); } }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toast-out { to { opacity: 0; transform: translate(-50%, 4px); } }
+@keyframes picker-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes like-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes count-swap { from { opacity: .25; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+/* Composer dock: only the entry animates; undocking returns the form to the document flow
+   at the end of the comment list, where a reverse animation would look like it flies away. */
+.reply-form.is-docked { animation: dock-enter var(--motion-base) var(--motion-ease-out); }
+.is-docking .zoom-control, .is-docking .detail-navigation { transition: bottom var(--motion-base) var(--motion-ease-out); }
+@keyframes dock-enter { from { opacity: 0; transform: translateY(10px); } }
+
+/* Settings panes and gallery picture swaps. */
+.settings-pane { animation: pane-in var(--motion-fast) var(--motion-ease-out); }
+.image-gallery.is-switching .gallery-image,
+.image-gallery.is-switching .expanded-image { animation: gallery-swap 140ms var(--motion-ease-out); }
+.image-modal.is-morphing .expanded-image { animation: none; }
+@keyframes pane-in { from { opacity: 0; transform: translateY(3px); } }
+@keyframes gallery-swap { from { opacity: 0; } }

@@ -4,6 +4,7 @@ import { api, errorOf, type ApiError } from './api';
 import type { Comment } from './data';
 import { Badges, ErrorNotice, postTime } from './Online';
 import { RichText } from './Emoji';
+import { FadeImage } from './FadeImage';
 
 interface ReplyPage { comments: Comment[]; hasMore: boolean; lastval: string }
 // Upstream may include empty/unsafe entries; only active http(s) or same-origin "/path" images are rendered.
@@ -18,21 +19,21 @@ export function commentImages(comment: Comment): string[] {
   }
   return images;
 }
-function CommentImage({ src, alt, label, onOpen }: { src: string; alt: string; label: string; onOpen: () => void }) {
+function CommentImage({ src, alt, label, onOpen }: { src: string; alt: string; label: string; onOpen: (source: HTMLElement | null) => void }) {
   const [failed, setFailed] = useState(false);
-  return <button type="button" className={`comment-image${failed ? ' is-error' : ''}`} aria-label={label} title={label} onClick={onOpen}>
-    <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+  return <button type="button" className={`comment-image${failed ? ' is-error' : ''}`} aria-label={label} title={label} onClick={event => onOpen(event.currentTarget.querySelector('img'))}>
+    <FadeImage src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
     {failed && <span className="comment-image-error" aria-hidden="true"><RefreshCw size={12} />加载失败</span>}
   </button>;
 }
-function CommentImages({ comment, onImage }: { comment: Comment; onImage: (c: Comment, index: number) => void }) {
+function CommentImages({ comment, onImage }: { comment: Comment; onImage: (c: Comment, index: number, source: HTMLElement | null) => void }) {
   const images = commentImages(comment);
   if (!images.length) return null;
   return <div className={`comment-images${images.length === 1 ? ' comment-images-single' : ''}`}>
-    {images.map((src, index) => <CommentImage key={src} src={src} alt={`${comment.author} 的评论图片 ${index + 1}`} label={`查看 ${comment.author} 的评论图片 ${index + 1}`} onOpen={() => onImage(comment, index)} />)}
+    {images.map((src, index) => <CommentImage key={src} src={src} alt={`${comment.author} 的评论图片 ${index + 1}`} label={`查看 ${comment.author} 的评论图片 ${index + 1}`} onOpen={source => onImage(comment, index, source)} />)}
   </div>;
 }
-export function CommentThread({ comment, onReply, onProfile, onLogin, onImage, onLike }: { comment: Comment; onReply: (c: Comment) => void; onProfile: (c: Comment) => void; onLogin: () => void; onImage: (c: Comment, index: number) => void; onLike: (c: Comment) => void }) {
+export function CommentThread({ comment, onReply, onProfile, onLogin, onImage, onLike, popping = false }: { comment: Comment; onReply: (c: Comment) => void; onProfile: (c: Comment) => void; onLogin: () => void; onImage: (c: Comment, index: number, source: HTMLElement | null) => void; onLike: (c: Comment) => void; popping?: boolean }) {
   const [replies, setReplies] = useState(comment.replies ?? []);
   const [expanded, setExpanded] = useState(false);
   const [hasMore, setHasMore] = useState(!!comment.hasMoreReplies);
@@ -82,6 +83,6 @@ export function CommentThread({ comment, onReply, onProfile, onLogin, onImage, o
           {expanded && <button onClick={() => setExpanded(false)} aria-expanded={true}>收起回复<ChevronUp size={13} /></button>}
         </div>
       </div>}
-    </div><button type="button" className={`comment-like${comment.supported ? ' is-supported' : ''}`} aria-pressed={!!comment.supported} aria-label={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} title={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} onClick={() => onLike(comment)}><ThumbsUp size={12} />{comment.likes}</button>
+    </div><button type="button" className={`comment-like${comment.supported ? ' is-supported' : ''}`} aria-pressed={!!comment.supported} aria-label={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} title={`${comment.supported ? '取消点赞' : '点赞'} ${comment.author} 的评论`} onClick={() => onLike(comment)}><ThumbsUp size={12} className={popping ? 'is-popping' : ''} /><span key={comment.likes} className="count">{comment.likes}</span></button>
   </div>;
 }
